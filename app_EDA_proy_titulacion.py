@@ -101,7 +101,8 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 # Sidebar
 with st.sidebar:
     # st.title('Proyecto de Titulación <br> México')
-    st.markdown("<h1 style='text-align: center;'>Transformación Digital <br>Un Problema de Clasificación Municipal</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>Transformación Digital: <br>Un Problema de Clasificación Municipal</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: left;'>Trabajo Presentado por Rodrigo Guarneros <hr>INFOTEC</h5>", unsafe_allow_html=True)
     st.sidebar.image("https://img.cdn-pictorem.com/uploads/collection/L/LD5RFK7TTK/900_Grasshopper-Geography_Elevation_map_of_Mexico_with_black_background.jpg", use_column_width=True)
 
     variable_seleccionada_numerica = st.selectbox('Selecciona la variable numérica de interés:', sorted(variable_list_numeric, reverse=False))
@@ -124,20 +125,16 @@ with st.sidebar:
     with st.expander('Enfoque del panel de control', expanded=False):
         st.write('''
             - Se basa en un enfoque de <span style="color:#C2185B">"Programación Orientada a Objetos"</span>.
-            - La población se puede modelar a partir de sus atributos y funciones que en escencia definen sus características y capacidades, respectivamente. 
-            - En este ejemplo, se parte de la pregunta básica <span style="color:#C2185B">¿Cuál es la tendencia de crecimiento poblacional a nivel nacional y por entidad federativa entre 1970 y 2050, y cómo varía esta tendencia según el género y la edad de la población?</span>
-            - Este aplicativo incluye atributos de la población mexicana como:
-                1. El año en el que se sitúa.
-                2. La Entidad Federativa a la que pertenece. 
-                3. El género de la población disponible en los datos (Femenino y Masculino).
-                4. La edad promedio y su distribución.
-            - Con base en estas características, el usuario puede generar combinaciones de interés para conocer las perspectivas sobre:
-                1. La evolución de la población entre 1970 y 2050. 
-                2. La pirámide poblacional. 
-                3. La distribución de la población por edad.
-            - Es posible también generar perspectivas sobre la distribución geográfica y ranking en dos dimensiones:
-                1. Población total por entidad federativa y nacional.
-                2. Edad promedio por estado y nacional.
+            - La población se puede modelar a partir de sus atributos y funciones que en escencia definen sus características y capacidades para aprovechar la revolución digital, respectivamente. 
+            - Este primer análisis exploratorio de la información disponible forma parte de un proyecto integral que busca: <span style="color:#C2185B">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
+            - Este aplicativo incluye atributos a nivel municipal tales como:
+                1. Número de viviendas. 
+                2. Grado educativo (Analfabetismo, Porcentaje de personas con educación básica, etc.).
+                3. Edad promedio, entre otas.
+            - Con base en estas características, se pueden generar diferentes combinaciones y visualizaciones de interés para conocer mejor aspectos como:
+                1. La distribución estadística de las variables. 
+                2. Relación entre las variables. 
+                3. La distribución geográfica de las variables.
             - La ventaja de un panel de control como este consiste en sus <span style="color:#C2185B">economías de escala y la capacidad que tiene para presentar insights más profundos respecto a la población y sus funciones o actividades, tales como capacidad adquisitiva, preferencias, crédito al consumo, acceso a servicios de conectividad, empleo, sequías y hasta modelos predictivos.</span> 
             ''', unsafe_allow_html=True)
 
