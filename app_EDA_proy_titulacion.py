@@ -88,8 +88,8 @@ columns_to_exclude_categorical = ['estado', 'lugar']
 variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
 variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
 
-datos_map = pd.read_csv('for_map_df.csv', encoding='Latin1')
-input_map = datos_map
+# datos_map = pd.read_csv('for_map_df.csv', encoding='Latin1')
+# input_map = datos_map
 # df_reshaped = pd.read_csv('data/result_sorted_final.csv', encoding='utf-8')
 # input_df = df_reshaped.sort_values(by="ENTIDAD", ascending=True)
 # input_df = df_reshaped # cholopleth, ranking_edad evolucion_poblacion
