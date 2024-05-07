@@ -102,7 +102,7 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 with st.sidebar:
     # st.title('Proyecto de Titulación <br> México')
     st.markdown("<h1 style='text-align: center;'>Transformación Digital: <br>Un Problema de Clasificación Municipal</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: left;'>Trabajo Presentado por Rodrigo Guarneros <hr>INFOTEC</h5>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'> <hr>INFOTEC <hr> Trabajo Presentado por Rodrigo Guarneros</h5>", unsafe_allow_html=True)
     st.sidebar.image("https://img.cdn-pictorem.com/uploads/collection/L/LD5RFK7TTK/900_Grasshopper-Geography_Elevation_map_of_Mexico_with_black_background.jpg", use_column_width=True)
 
     variable_seleccionada_numerica = st.selectbox('Selecciona la variable numérica de interés:', sorted(variable_list_numeric, reverse=False))
@@ -215,7 +215,7 @@ def generate_boxplot_with_annotations(df, variable):
     df['muincipio'] = df['muincipio'].astype(str)
     df['estado'] = df['estado'].astype(str)
 
-    df['lugar'] = df['muincipio'] + ', ' + df['estado']
+    df['lugar'] = df['lugar_1']
 
     # Create box plot
     fig = px.box(
@@ -282,8 +282,8 @@ def generate_boxplot_with_annotations(df, variable):
     fig.update_traces(marker=dict(opacity=0.8, line=dict(color='rgba(255, 165, 0, 0.5)', width=1)))
 
     # Add 'Municipalidad' and variable values to the tooltip
-    fig.update_traces(hovertemplate='<b>Municipalidad:</b> %{customdata[0]}<br><b>%{y}</b><br>Edad promedio=%{customdata[1]:,.2f}')
-    fig.update_layout(title_font=dict(color='#FFD86C'), xaxis_title_font=dict(color='#FFD86C'), yaxis_title_font=dict(color='#FFD86C'))
+    fig.update_traces(hovertemplate='<b>Municipality:</b> %{customdata[0]}<br><b>'+variable+':</b> %{y}')
+    fig.update_layout(title_font=dict(color='#FFD86C'), xaxis_title_font=dict(color='#FFD86C'), yaxis_title_font=dict(color='#FFD86C'))    
     
     return fig
     
@@ -359,26 +359,25 @@ Titulo_dinamico = titulo_dinamico(variable_seleccionada_numerica)
 st.markdown(Titulo_dinamico, unsafe_allow_html=True)
 # calculos_df
 # Define the tabs
-tab1, tab2, tab3 = st.tabs(["Histograma","Gráfica de Caja", "Mapa"])
+tab1, tab2, tab3, tab4 = st.tabs(["Histograma","Gráfica de Caja", "Correlaciones","Mapa"])
 
 # El histograma
 with tab1:
     with st.expander('Análisis', expanded=False):
         # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
-        st.markdown(f'Las entidades que claramente han alcanzado su máximo poblacional y revertido su tendencia para registrar tasas decrecientes son: Ciudad de México (2019), Guerrero (2016) y Veracruz (2016).', unsafe_allow_html=True)
-        st.markdown(f'<span style="color:#C2185B">Nuevo León</span> es una de las entidades federativas que <span style="color:#C2185B">se pronostica que no alcanzará su máximo histórico en 2070 y seguirá creciendo aunque con menor aceleración</span>.', unsafe_allow_html=True)
-        st.markdown(f'Se han encontrado tendencias que requieren más atención por considerarse un fenómeno atípico (no atribuible al procesamiento de los datos) o ajustes en la medición. Como son los casos de: <span style="color:#C2185B">Campeche, Chiapas, Nayarit, Durango, Quintana Roo, Sinaloa, Sonora, Tabasco, Tamaulipas y Zacatecas</span>.', unsafe_allow_html=True)
-
+        st.markdown(f'En esta visualización se pretenden calcular las estadísticas de tendencia central por variable disponible y la distribución ilustrada en un histograma donde se distinguen, en su caso, las categorías relacionadas con tres variables diferentes.', unsafe_allow_html=True)
+        st.markdown(f'La primera vairable categórica es: <span style="color:#C2185B"> la disponibilidad de servicios de televisión o audio restringido (TAR), cuyas categorías posibles son: </span><span style="color:#C2185B">Sí tienen disponibilidad o No tienen disponibilidad</span>.', unsafe_allow_html=True)
+        st.markdown(f'La segunda variable categórica es: <span style="color:#C2185B"> la isponibilidad de banda ancha fija móvil, con posibles valores: Sí y No</span>.', unsafe_allow_html=True)
+        st.markdown(f'La tercera variable categórica es: <span style="color:#C2185B"> la disponibilidad de banda ancha fija alámbrica, con posibles valores: Sí y No</span>.', unsafe_allow_html=True)
     st.plotly_chart(fig_hist, use_container_width=True, height=500)
 
 # El diagrama de caja
 with tab2:
     with st.expander('Análisis', expanded=False):
         # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
-        st.markdown(f'Las entidades que claramente han alcanzado su máximo poblacional y revertido su tendencia para registrar tasas decrecientes son: Ciudad de México (2019), Guerrero (2016) y Veracruz (2016).', unsafe_allow_html=True)
-        st.markdown(f'<span style="color:#C2185B">Nuevo León</span> es una de las entidades federativas que <span style="color:#C2185B">se pronostica que no alcanzará su máximo histórico en 2070 y seguirá creciendo aunque con menor aceleración</span>.', unsafe_allow_html=True)
-        st.markdown(f'Se han encontrado tendencias que requieren más atención por considerarse un fenómeno atípico (no atribuible al procesamiento de los datos) o ajustes en la medición. Como son los casos de: <span style="color:#C2185B">Campeche, Chiapas, Nayarit, Durango, Quintana Roo, Sinaloa, Sonora, Tabasco, Tamaulipas y Zacatecas</span>.', unsafe_allow_html=True)
-
+        st.markdown(f'Los diagramas de caja tienen la peculiaridad de visualizar claramente los cuartiles de la distribución y los datos aberrantes.', unsafe_allow_html=True)
+        st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es posible ver en qué variables tiene más brechas cada municipio, dónde son más similares, qué característica tiene mayor dispersión</span>.', unsafe_allow_html=True)
+        
     st.plotly_chart(fig_boxplot, use_container_width=True, height=500)
 
 #     with chart2_col:
