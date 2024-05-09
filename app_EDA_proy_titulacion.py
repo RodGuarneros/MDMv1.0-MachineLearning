@@ -458,7 +458,7 @@ with tab4:
     with st.expander('Análisis', expanded=False):
         # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
         st.markdown(f'El mapa que aquí se presenta permite visualizar la distribución geográfica de cada variable para efectos de identificar efectos regionales.', unsafe_allow_html=True)
-        st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es importante recordar que este mapa es una representación visual que nos permite identificar tendencias relevantes a considerar para la construcción del modelo de aprendizaje automático predictivo.</span>.', unsafe_allow_html=True)
+        st.markdown(f'<span style="color:#C2185B">Se trata de un primer acercamiento <span style="color:#C2185B">donde es importante recordar que este mapa es una representación visual que nos permite identificar tendencias relevantes a considerar para la construcción del modelo de aprendizaje automático predictivo.</span>', unsafe_allow_html=True)
     st.plotly_chart(fig_scatter, use_container_width=True, height=500)
 
 
