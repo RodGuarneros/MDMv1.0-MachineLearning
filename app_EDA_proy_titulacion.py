@@ -102,7 +102,7 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 with st.sidebar:
     # st.title('Proyecto de Titulación <br> México')
     st.markdown("<h3 style='text-align: center;'>Aprendizaje Automático para Clasificar Municipios<br> por su Vocación Digital</h3>", unsafe_allow_html=True)
-    st.markdown("<h5 style='text-align: center;'> <hr>INFOTEC <hr> Trabajo de Investigación presentado por Rodrigo Guarneros</h5>", unsafe_allow_html=True)
+    st.markdown("<h5 style='text-align: center;'> <hr>INFOTEC (Primera Etapa AED)<hr> Trabajo de Investigación presentado por Rodrigo Guarneros</h5>", unsafe_allow_html=True)
     st.sidebar.image("https://img.cdn-pictorem.com/uploads/collection/L/LD5RFK7TTK/900_Grasshopper-Geography_Elevation_map_of_Mexico_with_black_background.jpg", use_column_width=True)
 
     variable_seleccionada_numerica = st.selectbox('Selecciona la variable numérica de interés:', sorted(variable_list_numeric, reverse=False))
