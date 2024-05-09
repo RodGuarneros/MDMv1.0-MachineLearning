@@ -18,7 +18,7 @@ import folium
 
 # Page configuration
 st.set_page_config(
-    page_title="Radiografía de la Transformación Digital",
+    page_title="Aprendizaje Automático para los Municipios",
     page_icon="📱💻📶📊",
     layout="wide",
     initial_sidebar_state="expanded")
@@ -101,12 +101,13 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 # Sidebar
 with st.sidebar:
     # st.title('Proyecto de Titulación <br> México')
-    st.markdown("<h1 style='text-align: center;'>Transformación Digital: <br>Un Problema de Clasificación Municipal</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center;'> <hr>INFOTEC <hr> Trabajo Presentado por Rodrigo Guarneros</h5>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Aprendizaje Automático para Clasificar Municipios<br> por su Vocación Digital</h3>", unsafe_allow_html=True)
+    st.markdown("<h5 style='text-align: center;'> <hr>INFOTEC <hr> Trabajo de Investigación presentado por Rodrigo Guarneros</h5>", unsafe_allow_html=True)
     st.sidebar.image("https://img.cdn-pictorem.com/uploads/collection/L/LD5RFK7TTK/900_Grasshopper-Geography_Elevation_map_of_Mexico_with_black_background.jpg", use_column_width=True)
 
     variable_seleccionada_numerica = st.selectbox('Selecciona la variable numérica de interés:', sorted(variable_list_numeric, reverse=False))
     variable_seleccionada_categorica = st.selectbox('Selecciona la variable categórica de interés:', sorted(variable_list_categorical, reverse=False))
+    variable_seleccionada_paracorrelacion = st.selectbox('Selecciona la variable que quieras correlaccionar con la primera selección:', sorted(variable_list_numeric, reverse=False))
 
     # # Entidad
     # entidad_list = list(df_reshaped.ENTIDAD.unique())
@@ -148,8 +149,9 @@ with st.sidebar:
             - Comentarios al correo electrónico rodrigo.guarneros@gmail.com
             ''', unsafe_allow_html=True)
 
-
-# Histograma
+##############
+# Histograma #
+##############
 
 def plot_histogram(df, numeric_column, categorical_column):
     """
@@ -289,6 +291,68 @@ def generate_boxplot_with_annotations(df, variable):
     
 fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_seleccionada_numerica)    
 
+##############
+### Scatter ##
+##############
+import plotly.express as px
+
+def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_variable):
+    # Create scatter plot with colored dots based on categorical variable
+    fig = px.scatter(df, x=x_variable, y=y_variable, hover_data={'lugar': True, categorical_variable: True}, color=categorical_variable,
+                     color_discrete_map={'No': 'pink', 'Sí':'blue'})
+
+    # Calculate correlation coefficient
+    correlation_coef = df[x_variable].corr(df[y_variable])
+
+    # Calculate adjusted R2
+    n = len(df)
+    p = 1  # Assuming only one independent variable
+    r_squared = correlation_coef ** 2
+    r_squared_adj = 1 - ((1 - r_squared) * (n - 1) / (n - p - 1))
+
+    # Update layout
+    fig.update_layout(
+        plot_bgcolor='rgb(30,30,30)',  # Set dark background color
+        paper_bgcolor='rgb(30,30,30)',  # Set dark paper color
+        font_color='white',  # Set font color to white
+        title=dict(
+            text=f"Diagrama de dispersión entre las variables '{x_variable}' y '{y_variable}'",
+            font=dict(color='white')  # Set title font color to white
+        ),
+        xaxis=dict(
+            title=f"Variable {x_variable}",  # Set x-axis title
+            titlefont=dict(color='white'),  # Set x-axis title font color to white
+            tickfont=dict(color='white')  # Set x-axis tick font color to white
+        ),
+        yaxis=dict(
+            title=f"Variable {y_variable}",  # Set y-axis title
+            titlefont=dict(color='white'),  # Set y-axis title font color to white
+            tickfont=dict(color='white')  # Set y-axis tick font color to white
+        ),
+        annotations=[
+            dict(
+                xref='paper',
+                yref='paper',
+                x=0.95,
+                y=1.05,
+                text=f'R² ajustada: {r_squared_adj:.4f}',
+                showarrow=False,
+                font=dict(color='orange')
+            )
+        ]
+    )
+    
+    # Update hover template to include Municipio and categorical variable
+    fig.update_traces(hovertemplate='<b>Municipio</b>: %{customdata[0]}<br>' +
+                                    f'<b>{x_variable}</b>: %{{x}}<br>' +
+                                    f'<b>{y_variable}</b>: %{{y}}<br>'
+                     )
+    fig.update_traces(marker=dict(opacity=0.6, line=dict(color='rgba(255, 165, 0, 0.5)', width=1)))
+
+    return fig
+
+# Call the function to generate scatter plot
+fig_scatter = generate_scatter_with_annotations(input_datos, variable_seleccionada_numerica, variable_seleccionada_paracorrelacion, variable_seleccionada_categorica)
 
 ######################
 ######## MAPA ########
@@ -379,6 +443,16 @@ with tab2:
         st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es posible ver en qué variables tiene más brechas cada municipio, dónde son más similares, qué característica tiene mayor dispersión</span>.', unsafe_allow_html=True)
         
     st.plotly_chart(fig_boxplot, use_container_width=True, height=500)
+
+# La correlacion
+with tab3:
+    with st.expander('Análisis', expanded=False):
+        # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
+        st.markdown(f'Los diagramas de caja tienen la peculiaridad de visualizar claramente los cuartiles de la distribución y los datos aberrantes.', unsafe_allow_html=True)
+        st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es posible ver en qué variables tiene más brechas cada municipio, dónde son más similares, qué característica tiene mayor dispersión</span>.', unsafe_allow_html=True)
+        
+    st.plotly_chart(fig_scatter, use_container_width=True, height=500)
+
 
 #     with chart2_col:
 #         with st.expander('Perspectivas', expanded=False):
