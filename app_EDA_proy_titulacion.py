@@ -448,9 +448,17 @@ with tab2:
 with tab3:
     with st.expander('Análisis', expanded=False):
         # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
-        st.markdown(f'Los diagramas de caja tienen la peculiaridad de visualizar claramente los cuartiles de la distribución y los datos aberrantes.', unsafe_allow_html=True)
-        st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es posible ver en qué variables tiene más brechas cada municipio, dónde son más similares, qué característica tiene mayor dispersión</span>.', unsafe_allow_html=True)
-        
+        st.markdown(f'Los diagramas de dispersión permiten visualizar las relaciones lineales y no lineales de las variables.', unsafe_allow_html=True)
+        st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es importante recordar que una alta correlación no necesariamente implica causalidad.</span>.', unsafe_allow_html=True)
+        st.markdown(f'Vale la pena recordar que la R² ajustada se interpreta como el porcentaje de la varianza de la variable dependiente (eje de las Y) que es explicada por la variable independiente (eje de las X).  La R² ajustada es una medida de la bondad de ajuste de un modelo de regresión lineal. Representa el porcentaje de la varianza de la variable dependiente (eje Y) que es explicada por la variable independiente (eje X) después de ajustar el modelo para tener en cuenta el número de predictores en el modelo y el tamaño de la muestra. En otras palabras, la R² ajustada penaliza la inclusión de términos en el modelo que no mejoran significativamente la capacidad predictiva', unsafe_allow_html=True)
+    st.plotly_chart(fig_scatter, use_container_width=True, height=500)
+
+# El Mapa
+with tab4:
+    with st.expander('Análisis', expanded=False):
+        # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
+        st.markdown(f'El mapa que aquí se presenta permite visualizar la distribución geográfica de cada variable para efectos de identificar efectos regionales.', unsafe_allow_html=True)
+        st.markdown(f'<span style="color:#C2185B">Se trata de un primera acercamiento <span style="color:#C2185B">donde es importante recordar que este mapa es una representación visual que nos permite identificar tendencias relevantes a considerar para la construcción del modelo de aprendizaje automático predictivo.</span>.', unsafe_allow_html=True)
     st.plotly_chart(fig_scatter, use_container_width=True, height=500)
 
 
