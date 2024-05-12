@@ -13,6 +13,8 @@ import plotly.io as pio
 import altair_viewer as altviewer
 import logging
 import folium
+import zipfile
+
 
 
 
@@ -88,14 +90,26 @@ columns_to_exclude_categorical = ['estado', 'lugar']
 variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
 variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
 
-# datos_map = pd.read_csv('for_map_df.csv', encoding='Latin1')
-# input_map = datos_map
-# df_reshaped = pd.read_csv('data/result_sorted_final.csv', encoding='utf-8')
-# input_df = df_reshaped.sort_values(by="ENTIDAD", ascending=True)
-# input_df = df_reshaped # cholopleth, ranking_edad evolucion_poblacion
-# df_reshaped_2 = pd.read_csv('data/result_sorted2_hist.csv', encoding='Latin1') # histograma
-# input_hist = df_reshaped_2
-# df_calculos = pd.read_csv('calculos.csv', encoding='Latin1')
+
+
+# Path to the ZIP file
+zip_file_path = 'for_map_df.zip'
+
+# Name of the CSV file inside the ZIP archive
+csv_file_name = 'for_map_df.csv'
+
+# Extract the CSV file from the ZIP archive
+with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+    zip_ref.extract(csv_file_name)
+
+# Read the CSV file into a DataFrame
+datos_map = pd.read_csv(csv_file_name, encoding='Latin1')
+
+# Drop rows with missing geometries
+datos_map.dropna(subset=['geometry'], inplace=True)  # Replace 'geometry_column' with the actual name of the geometry column
+
+# Assign the DataFrame to input_map
+input_map = datos_map
 
 
 # Sidebar
@@ -357,55 +371,47 @@ fig_scatter = generate_scatter_with_annotations(input_datos, variable_selecciona
 ######################
 ######## MAPA ########
 ######################
+def map_municipios(input_map, variable):
+    input_map[variable] = pd.to_numeric(input_map[variable], errors='coerce')
 
-# # Load GeoJSON data into GeoDataFrame
-# # Assuming merged_gdf is your GeoDataFrame
-# def map_municipios(input_map, variable):
+    # Define a function to map values to colors
+    def color_producer(value):
+        if value is None:
+            return '#808080'  # grey for NaN values
+        elif value < input_map[variable].quantile(0.33):
+            return 'red'  # red for lower values
+        elif value < input_map[variable].quantile(0.66):
+            return 'yellow'  # yellow for middle values
+        else:
+            return 'green'  # green for higher values
 
-#     input_map[variable] = pd.to_numeric(input_map[variable], errors='coerce')
+    # Center the map on Mexico
+    mexico_center = [23.6345, -102.5528]  # Latitude and longitude of Mexico
 
-#     # Drop rows with NaN values in 'escolaridad_promedio' column
-#     input_map = input_map.dropna(subset=[variable])
+    # Create the map centered on Mexico with dark layout
+    municipios_map = folium.Map(location=mexico_center, zoom_start=5, tiles='CartoDB dark_matter')
 
-# # Define a function to map values to colors
-#     def color_producer(value):
-#         if value is None:
-#             return '#808080'  # grey for NaN values
-#         elif value < input_map[variable].quantile(0.33):
-#             return 'red'  # red for lower values
-#         elif value < input_map[variable].quantile(0.66):
-#             return 'yellow'  # yellow for middle values
-#         else:
-#             return 'green'  # green for higher values
+    # Add Choropleth layer to the map
+    folium.GeoJson(
+        input_map,
+        name='choropleth',
+        style_function=lambda feature: {
+            'fillColor': color_producer(feature['properties'][variable]),
+            'color': 'black',
+            'weight': 1,
+            'fillOpacity': 0.6,
+        },
+        highlight_function=lambda x: {'weight': 3, 'fillOpacity': 0.7},
+        tooltip=folium.features.GeoJsonTooltip(fields=['lugar', variable],
+                                                aliases=['Municipality', variable],
+                                                labels=True,
+                                                sticky=True)
+    ).add_to(municipios_map)
 
-# # Center the map on Mexico
-#     mexico_center = [23.6345, -102.5528]  # Latitude and longitude of Mexico
-
-# # Create the map centered on Mexico with dark layout
-#     municipios_map = folium.Map(location=mexico_center, zoom_start=5, tiles='CartoDB dark_matter')
-
-# # Add Choropleth layer to the map
-#     folium.GeoJson(
-#         input_map,
-#         name='choropleth',
-#         style_function=lambda feature: {
-#             'fillColor': color_producer(feature['properties'][variable]),
-#             'color': 'black',
-#             'weight': 1,
-#             'fillOpacity': 0.6,
-#         },
-#         highlight_function=lambda x: {'weight': 3, 'fillOpacity': 0.7},
-#         tooltip=folium.features.GeoJsonTooltip(fields=['lugar', variable],
-#                                                 aliases=['Municipality', variable],
-#                                                 labels=True,
-#                                                 sticky=True)
-#     ).add_to(municipios_map)
-
-# # Display the map
-#     return municipios_map
-
-# fig_map = map_municipios(input_map, variable_seleccionada_numerica)
-
+    # Display the map
+    return municipios_map
+# Create the map
+fig_map = map_municipios(datos_map, variable_seleccionada_numerica)
 
 #########################
 ### Título Dinámico #####
