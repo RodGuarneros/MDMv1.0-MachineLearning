@@ -14,13 +14,15 @@ import altair_viewer as altviewer
 import logging
 import folium
 import zipfile
+from streamlit import components
+
 
 
 
 
 # Page configuration
 st.set_page_config(
-    page_title="Aprendizaje Automático para los Municipios",
+    page_title="Aprendizaje Automático para los Municipios de México",
     page_icon="📱💻📶📊",
     layout="wide",
     initial_sidebar_state="expanded")
@@ -93,22 +95,18 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 
 
 # Path to the ZIP file
-zip_file_path = 'for_map_df.zip'
+zip_file_path = 'to_mapping.zip'
 
 # Name of the CSV file inside the ZIP archive
-csv_file_name = 'for_map_df.csv'
+csv_file_name = 'to_mapping.geojson'
 
 # Extract the CSV file from the ZIP archive
 with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
     zip_ref.extract(csv_file_name)
 
 # Read the CSV file into a DataFrame
-datos_map = pd.read_csv(csv_file_name, encoding='Latin1')
+datos_map = gpd.read_file("to_mapping.geojson")
 
-# Drop rows with missing geometries
-datos_map.dropna(subset=['geometry'], inplace=True)  # Replace 'geometry_column' with the actual name of the geometry column
-
-# Assign the DataFrame to input_map
 input_map = datos_map
 
 
@@ -308,7 +306,6 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 ##############
 ### Scatter ##
 ##############
-import plotly.express as px
 
 def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_variable):
     # Create scatter plot with colored dots based on categorical variable
@@ -371,47 +368,75 @@ fig_scatter = generate_scatter_with_annotations(input_datos, variable_selecciona
 ######################
 ######## MAPA ########
 ######################
-def map_municipios(input_map, variable):
-    input_map[variable] = pd.to_numeric(input_map[variable], errors='coerce')
 
-    # Define a function to map values to colors
-    def color_producer(value):
-        if value is None:
-            return '#808080'  # grey for NaN values
-        elif value < input_map[variable].quantile(0.33):
-            return 'red'  # red for lower values
-        elif value < input_map[variable].quantile(0.66):
-            return 'yellow'  # yellow for middle values
-        else:
-            return 'green'  # green for higher values
-
+def map_municipios(input, variable_selected):
     # Center the map on Mexico
     mexico_center = [23.6345, -102.5528]  # Latitude and longitude of Mexico
 
     # Create the map centered on Mexico with dark layout
     municipios_map = folium.Map(location=mexico_center, zoom_start=5, tiles='CartoDB dark_matter')
 
-    # Add Choropleth layer to the map
+    # Calculate statistics for the selected variable
+    selected_variable_data = input[variable_selected]
+    variable_mean = selected_variable_data.mean()
+    variable_median = selected_variable_data.median()
+    variable_std = selected_variable_data.std()
+
+    variable_mean = '{:.2f}'.format(variable_mean)
+    variable_median = '{:.2f}'.format(variable_median)
+    variable_std = '{:.2f}'.format(variable_std)
+
+    # Add Choropleth layer to the map with tooltip
     folium.GeoJson(
-        input_map,
+        input,
         name='choropleth',
         style_function=lambda feature: {
-            'fillColor': color_producer(feature['properties'][variable]),
+            'fillColor': color_producer(feature['properties'][variable_selected]),
             'color': 'black',
             'weight': 1,
             'fillOpacity': 0.6,
         },
         highlight_function=lambda x: {'weight': 3, 'fillOpacity': 0.7},
-        tooltip=folium.features.GeoJsonTooltip(fields=['lugar', variable],
-                                                aliases=['Municipality', variable],
-                                                labels=True,
-                                                sticky=True)
+        tooltip=folium.features.GeoJsonTooltip(
+            fields=['lugar', variable_selected],
+            aliases=['Nombre del Municipio', f'{variable_selected}:'],
+            localize=True,
+            sticky=True,
+        )
     ).add_to(municipios_map)
 
-    # Display the map
+    # Add notation for calculated fields on the top right corner
+    notation = f"<div style='color: white; font-family: Arial; font-size: 8pt'>Estadísticos Nacionales: <span style='color: green;'>{variable_selected}<br>Media:<span style='color: green;'>{variable_mean}</span><br>Mediana:<span style='color: green;'>{variable_median}<br>Desviación estándar:<span style='color: green;'>{variable_std}</div>"
+    folium.Marker(
+        [mexico_center[0]-4, mexico_center[1]-15],  # Adjust position as needed
+        icon=folium.DivIcon(html=notation),
+        tooltip=None
+    ).add_to(municipios_map)
+
+    # Return the map
     return municipios_map
+
+
+# Assuming merged_gdf is your GeoDataFrame
+df = datos_map
+
+# Define a function to map values to colors
+def color_producer(value):
+    if value is None:
+        return '#808080'  # grey for NaN values
+    elif value < df[variable_seleccionada_numerica].quantile(0.33):
+        return '#ff222b'  # red for lower values
+    elif value < df[variable_seleccionada_numerica].quantile(0.66):
+        return '#fad8b1'  # yellow for middle values
+    else:
+        return '#3cf60e'  # green for higher values
+
+
 # Create the map
 fig_map = map_municipios(datos_map, variable_seleccionada_numerica)
+
+# Convert the Folium map to HTML
+
 
 #########################
 ### Título Dinámico #####
@@ -459,64 +484,9 @@ with tab3:
         st.markdown(f'Vale la pena recordar que la R² ajustada se interpreta como el porcentaje de la varianza de la variable dependiente (eje de las Y) que es explicada por la variable independiente (eje de las X).  La R² ajustada es una medida de la bondad de ajuste de un modelo de regresión lineal. Representa el porcentaje de la varianza de la variable dependiente (eje Y) que es explicada por la variable independiente (eje X) después de ajustar el modelo para tener en cuenta el número de predictores en el modelo y el tamaño de la muestra. En otras palabras, la R² ajustada penaliza la inclusión de términos en el modelo que no mejoran significativamente la capacidad predictiva', unsafe_allow_html=True)
     st.plotly_chart(fig_scatter, use_container_width=True, height=500)
 
-# El Mapa
 with tab4:
     with st.expander('Análisis', expanded=False):
-        # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
         st.markdown(f'El mapa que aquí se presenta permite visualizar la distribución geográfica de cada variable para efectos de identificar efectos regionales.', unsafe_allow_html=True)
         st.markdown(f'<span style="color:#C2185B">Se trata de un primer acercamiento <span style="color:#C2185B">donde es importante recordar que este mapa es una representación visual que nos permite identificar tendencias relevantes a considerar para la construcción del modelo de aprendizaje automático predictivo.</span>', unsafe_allow_html=True)
-    st.plotly_chart(fig_scatter, use_container_width=True, height=500)
-
-
-#     with chart2_col:
-#         with st.expander('Perspectivas', expanded=False):
-#             st.markdown(f'La edad promedio en <span style="color:#C2185B">{selected_entidad}</span> para el año <span style="color:#C2185B">{selected_year}</span> se registra en <span style="color:#C2185B">{calculos_df.loc[0, "Edad promedio"]:,.2f} años</span>.', unsafe_allow_html=True)
-#             st.markdown(f'Claramente y sin excepción, las mujeres superan a los hombres en número.', unsafe_allow_html=True)
-#             st.markdown(f'Todos los estados proyectan un giro en la pirámide poblacional donde las personas más jóvenes comienzan a reducirse año con año y la población adulta, incluidos los mayores de 65 años, comienza a aumentar, lo que <span style="color:#C2185B">incrementa la tasa de dependencia (número de personas que no trabaja y tiene más de 65 años, comparada con aquellos que están en edad de trabajar)</span>.', unsafe_allow_html=True)
-        
-#         st.plotly_chart(fig_piramide, use_container_width=True, height=500)
-
-#     with chart3_col:
-#         with st.expander('Perspectivas', expanded=False):
-#             st.markdown(f'La edad promedio en <span style="color:#C2185B">{selected_entidad}</span> para el año <span style="color:#C2185B">{selected_year}</span> es de <span style="color:#C2185B">{calculos_df.loc[0, "Edad promedio"]:,.2f} años</span>. Se trata de un estadístico de tendencia central útil. No obstante, ante la existencia de datos aberrantes, se sugiere la mediana de la edad disponible en las última sección de este tablero, cuya cualidad es que es menos sensible a los datos extremos.', unsafe_allow_html=True)
-#             st.markdown(f'Si bien excedemos el objetivo de esta app, vale la pena señalar que la distribución por edad tiende a reducir su sesgo y comportarse como una distribución normal en periodos posteriores a 2030. Lo anterior es atribuible a factores tales como: <span style="color:#C2185B">(i) Reducción de las tasas de nacimiento; (ii) Incremento en la expectativa de vida; (iii) Reducción de las tasas de mortalidad; (iv) Factores sociales y económicos; (v) Impacto migratorio</span>.', unsafe_allow_html=True)
-
-        
-#         st.plotly_chart(fig_hist, use_container_width=True, height=500)
-
-# # Define the content for tab2
-# with tab2:
-#     with st.expander('Perspectivas', expanded=False):
-#         st.write('''
-#                  - En 1970, las cinco entidades federativas más pobladas fueron: Ciudad de México (3.5 M), Estado de México (2.08 M), Veracruz (2.06 M), Jalisco (1.7 M) y Puebla (1.4 M).
-#                  - En 2024, la lista de las entidades federativas más pobladas es la siguiente: Estado de México (8.5 M), Ciudad de México (4.4 M), Jalisco (4.3 M), Veracruz (3.9 M) y Puebla (3.4 M).
-#                  - Para 2050, las trayectorias poblacionales sugieren que la lista será encabezada por: Estado de México (18.1 M), Jalisco (10.05 M), Nuevo León (8.4 M), Puebla (8.3 M) y Ciudad de México (8.01 M).
-#                  - Si nos preguntamos cuál debería ser la tasa de crecimiento anual promedio que cada estado debería experimentar en su población para alcanzar las predicciones de los próximos 26 años, la respuesta es la siguiente: Estado de México (2.9%), Jalisco (3.3%), Nuevo León (1.11%), Puebla (3.5%) y Ciudad de México (2.3%).
-#                  - Estas tasas de crecimiento poblacionales son considerablemente altas si se comparan con la media de la tasa de crecimiento anual a nivel mundial, que se espera sea del 1% durante el mismo período.                    
-#                  ''')
-
-#     chart1_col, chart2_col = st.columns((1, 1))  # Two columns for Tab2
-
-#     with chart1_col:
-#         st.plotly_chart(mapa_poblacion_render2, use_container_width=True, height=500)
-
-#     with chart2_col:
-#         st.plotly_chart(fig_ranking2, use_container_width=True)
-
-# # Define the content for tab3
-# with tab3:
-#     with st.expander('Perspectivas', expanded=False):
-#         st.write('''
-#                  - La mediana de la edad en 2050, a nivel mundial, se estima en 41 años.  
-#                  - En México, en 1970, las cinco entidades federativas con la mediana de edad más alta registrada son: Yucatán (23.4 años), Ciudad de México (22.7 años), Tlaxcala (22.5 años), Nuevo León (22.4 años) y Tamaulipas (22.3 años).
-#                  - En 2024, la lista de las entidades federativas con mayor mediana de edad es la siguiente: Ciudad de México (37.3 años), Veracruz (34.1 años), Morelos (33.6 años), Colima (33.6 años) y Tamaulipas (33.3 años).
-#                  - Para 2050, las predicciones poblacionales sugieren que la lista estará encabezada por: Ciudad de México (47.8 años), Colima (43.8 años), Veracruz (43.5 años), Morelos (43 años) y Yucatán (43.6 años), mientras que la mediana de la población en todo el país será de 40.9 años.
-#                  ''')
-
-#     chart1_col, chart2_col = st.columns((1, 1))  # Two columns for Tab3
-
-#     with chart1_col:
-#         st.plotly_chart(mapa_poblacion_render, use_container_width=True, height=500)
-
-#     with chart2_col:
-#         st.plotly_chart(fig_ranking, use_container_width=True)
+    folium_map_html = fig_map._repr_html_()
+    st.components.v1.html(folium_map_html, width=800, height=600)
