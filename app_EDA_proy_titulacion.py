@@ -95,11 +95,6 @@ st.markdown("""
 # Conectar con MongoDB
 
 # Cargar variables de entorno
-load_dotenv('MONGO_URI.env')
-mongo_uri = os.getenv("MONGO_URI")  # Asegúrate de tener esta variable en tu archivo .env
-
-# Función para convertir ObjectId a string
-# Función para convertir ObjectId a string
 def convert_objectid_to_str(document):
     for key, value in document.items():
         if isinstance(value, ObjectId):
@@ -109,10 +104,10 @@ def convert_objectid_to_str(document):
 # Función para cargar y procesar los datos con cache
 @st.cache_data
 def bajando_procesando_datos():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
-    # Conexión a MongoDB usando la URI desde la variable de entorno
+    # Conexión a MongoDB usando la URI desde los secretos
     client = MongoClient(mongo_uri)
     db = client['Municipios_Rodrigo']
     collection = db['datos_finales']
@@ -150,13 +145,13 @@ datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
 datos['Penetración BAF (Fibra)'] = datos['penetracion_baf_fibra']
 datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
-# Obteniendo el data set completo: 
+# OBTENIENDO EL DATASET COMPLETO:
 @st.cache_data
 def bajando_procesando_datos_completos():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
-    # Conexión a MongoDB usando la URI desde la variable de entorno
+    # Conexión a MongoDB usando la URI desde los secretos
     client = MongoClient(mongo_uri)
     db = client['Municipios_Rodrigo']
     collection = db['completo']
@@ -168,23 +163,20 @@ def bajando_procesando_datos_completos():
     for column in dataset_complete.select_dtypes(include=['object']).columns:
         dataset_complete[column] = dataset_complete[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
 
-
-
     # Limpiar los nombres de las columnas eliminando espacios
     dataset_complete.columns = dataset_complete.columns.str.strip()
 
     return dataset_complete
 
 dataset_complete = bajando_procesando_datos_completos()
-# dataset_complete = pd.read_csv("fuentes/VARIABLES_FINALES_MODELADO.csv")
 
-# OBTENIENDO X FOR TRAINING NORMALIZER
+# OBTENIENDO X PARA EL TRAINING NORMALIZER:
 @st.cache_data
 def bajando_procesando_X_entrenamiento():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
-    # Conexión a MongoDB usando la URI desde la variable de entorno
+    # Conexión a MongoDB usando la URI desde los secretos
     client = MongoClient(mongo_uri)
     db = client['Municipios_Rodrigo']
     collection = db['X_for_training_normalizer']
@@ -199,15 +191,14 @@ def bajando_procesando_X_entrenamiento():
     return df
 
 df = bajando_procesando_X_entrenamiento()
-# df = pd.read_csv('fuentes/X_for_training_Normalizer.csv', encoding='Latin1') 
 
-# OBTENIENDO DF_PCA_NORMALIZER:
+# OBTENIENDO DF PCA NORMALIZER:
 @st.cache_data
 def bajando_procesando_df_normalizado():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
-    # Conexión a MongoDB usando la URI desde la variable de entorno
+    # Conexión a MongoDB usando la URI desde los secretos
     client = MongoClient(mongo_uri)
     db = client['Municipios_Rodrigo']
     collection = db['df_pca_norm']
@@ -219,17 +210,15 @@ def bajando_procesando_df_normalizado():
     # Limpiar los nombres de las columnas eliminando espacios
     df_normalizado.columns = df_normalizado.columns.astype(str).str.strip()
 
-
     return df_normalizado
 
 df_normalizado = bajando_procesando_df_normalizado()
-# df_normalizado = pd.read_csv('fuentes/df_pca_Normalizer.csv')
 
-
+# Procesamiento de variables numéricas y categóricas
 variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
 variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-variable_list_municipio = list(input_datos['Lugar'].unique()) # Municipio seleccionado
-# variable_list_estado = list(input_datos['Estado'].unique()) # Estado seleccionado
+variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
+
 columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
 columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
 
@@ -237,7 +226,6 @@ columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Regió
 variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
 # Categóricas
 variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
-
 
 # Conectar a MongoDB con caché para los polígonos
 @st.cache_resource
@@ -259,6 +247,7 @@ def geojson_to_geodataframe(geojson_data):
     return gpd.read_file(BytesIO(geojson_data))
 
 # Conectar a MongoDB
+mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
 db = connect_to_mongo(mongo_uri)
 
 # Obtener el archivo GeoJSON
@@ -275,6 +264,7 @@ if geojson is not None:
 
     # Fusionar los datos con la geometría
     dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
+
 
 ###################################################################################################################
 ###################################################################################################################
