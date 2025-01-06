@@ -95,185 +95,226 @@ st.markdown("""
 # Conectar con MongoDB
 
 # Cargar variables de entorno
-load_dotenv('MONGO_URI.env')
-mongo_uri = os.getenv("MONGO_URI")  # Asegúrate de tener esta variable en tu archivo .env
 
-# Función para convertir ObjectId a string
-# Función para convertir ObjectId a string
+# Configuración inicial
+def init_mongodb():
+    """Inicializa la conexión a MongoDB con manejo de errores"""
+    try:
+        # Cargar variables de entorno
+        if os.path.exists('MONGO_URI.env'):
+            load_dotenv('MONGO_URI.env')
+        
+        mongo_uri = os.getenv("MONGO_URI")
+        if not mongo_uri:
+            st.error("No se encontró la variable de entorno MONGO_URI")
+            st.stop()
+            
+        # Configurar cliente MongoDB con timeouts más largos
+        client = MongoClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=20000,
+            socketTimeoutMS=20000
+        )
+        
+        # Verificar conexión
+        client.admin.command('ping')
+        return client
+        
+    except (ServerSelectionTimeoutError, ConnectionFailure) as e:
+        st.error(f"""Error de conexión a MongoDB: {str(e)}
+        Verifica:
+        1. Que la URI es correcta
+        2. Que las IPs están habilitadas en MongoDB Atlas
+        3. Que el cluster está activo""")
+        st.stop()
+
 def convert_objectid_to_str(document):
+    """Convierte ObjectId a string en un documento"""
     for key, value in document.items():
         if isinstance(value, ObjectId):
             document[key] = str(value)
     return document
 
-# Función para cargar y procesar los datos con cache
 @st.cache_data
 def bajando_procesando_datos():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
-    
-    # Conexión a MongoDB usando la URI desde la variable de entorno
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['datos_finales']
+    """Carga y procesa los datos principales"""
+    try:
+        client = init_mongodb()
+        db = client['Municipios_Rodrigo']
+        collection = db['datos_finales']
 
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
-    datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        datos_raw = collection.find()
+        datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
 
-    # Asegurarse de que los datos sean interpretados correctamente en Latin1
-    for column in datos.select_dtypes(include=['object']).columns:
-        datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
+        # Procesamiento de caracteres Latin1
+        for column in datos.select_dtypes(include=['object']).columns:
+            datos[column] = datos[column].apply(
+                lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x
+            )
 
-    # Limpiar los nombres de las columnas eliminando espacios
-    datos.columns = datos.columns.str.strip()
+        datos.columns = datos.columns.str.strip()
 
-    # Verifica si la columna 'Madurez' existe antes de convertirla
-    if 'Madurez' in datos.columns:
-        datos['Madurez'] = datos['Madurez'].astype('category')
-    else:
-        st.write("La columna 'Madurez' no existe en los datos.")
+        # Procesar columna Madurez
+        if 'Madurez' in datos.columns:
+            datos['Madurez'] = datos['Madurez'].astype('category')
+        if 'Etapa_Madurez' in datos.columns:
+            datos['Madurez'] = datos['Etapa_Madurez'].astype('category')
 
-    # Verifica si 'Etapa_Madurez' existe y créala si es necesario
-    if 'Etapa_Madurez' in datos.columns:
-        datos['Madurez'] = datos['Etapa_Madurez'].astype('category')
+        client.close()
+        return datos
+        
+    except Exception as e:
+        st.error(f"Error al procesar datos: {str(e)}")
+        st.stop()
 
-    return datos
-
-# Llamar a la función para cargar y procesar los datos
-datos = bajando_procesando_datos()
-input_datos = datos
-
-# Procesar otras columnas como se mencionaba en el código original
-datos['Operadores Escala Pequeña BAF'] = datos['operadores_escal_pequeña_baf']
-datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
-datos['Penetración BAF (Fibra)'] = datos['penetracion_baf_fibra']
-datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
-
-# Obteniendo el data set completo: 
 @st.cache_data
 def bajando_procesando_datos_completos():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
-    
-    # Conexión a MongoDB usando la URI desde la variable de entorno
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['completo']
+    """Carga y procesa el dataset completo"""
+    try:
+        client = init_mongodb()
+        db = client['Municipios_Rodrigo']
+        collection = db['completo']
 
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
+        datos_raw = collection.find()
+        dataset_complete = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        
+        for column in dataset_complete.select_dtypes(include=['object']).columns:
+            dataset_complete[column] = dataset_complete[column].apply(
+                lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x
+            )
 
-    dataset_complete = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-    for column in dataset_complete.select_dtypes(include=['object']).columns:
-        dataset_complete[column] = dataset_complete[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
+        dataset_complete.columns = dataset_complete.columns.str.strip()
+        
+        client.close()
+        return dataset_complete
+        
+    except Exception as e:
+        st.error(f"Error al procesar dataset completo: {str(e)}")
+        st.stop()
 
-
-
-    # Limpiar los nombres de las columnas eliminando espacios
-    dataset_complete.columns = dataset_complete.columns.str.strip()
-
-    return dataset_complete
-
-dataset_complete = bajando_procesando_datos_completos()
-# dataset_complete = pd.read_csv("fuentes/VARIABLES_FINALES_MODELADO.csv")
-
-# OBTENIENDO X FOR TRAINING NORMALIZER
 @st.cache_data
 def bajando_procesando_X_entrenamiento():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
-    
-    # Conexión a MongoDB usando la URI desde la variable de entorno
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['X_for_training_normalizer']
+    """Carga y procesa datos de entrenamiento"""
+    try:
+        client = init_mongodb()
+        db = client['Municipios_Rodrigo']
+        collection = db['X_for_training_normalizer']
 
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
-    df = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        datos_raw = collection.find()
+        df = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        df.columns = df.columns.str.strip()
+        
+        client.close()
+        return df
+        
+    except Exception as e:
+        st.error(f"Error al procesar datos de entrenamiento: {str(e)}")
+        st.stop()
 
-    # Limpiar los nombres de las columnas eliminando espacios
-    df.columns = df.columns.str.strip()
-
-    return df
-
-df = bajando_procesando_X_entrenamiento()
-# df = pd.read_csv('fuentes/X_for_training_Normalizer.csv', encoding='Latin1') 
-
-# OBTENIENDO DF_PCA_NORMALIZER:
 @st.cache_data
 def bajando_procesando_df_normalizado():
-    # Obtener la URI de MongoDB desde las variables de entorno
-    mongo_uri = os.getenv("MONGO_URI")
-    
-    # Conexión a MongoDB usando la URI desde la variable de entorno
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['df_pca_normalizer']
+    """Carga y procesa datos normalizados"""
+    try:
+        client = init_mongodb()
+        db = client['Municipios_Rodrigo']
+        collection = db['df_pca_norm']
 
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
-    df_normalizado = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        datos_raw = collection.find()
+        df_normalizado = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        df_normalizado.columns = df_normalizado.columns.astype(str).str.strip()
+        
+        client.close()
+        return df_normalizado
+        
+    except Exception as e:
+        st.error(f"Error al procesar datos normalizados: {str(e)}")
+        st.stop()
 
-    # Limpiar los nombres de las columnas eliminando espacios
-    df_normalizado.columns = df_normalizado.columns.str.strip()
-
-    return df_normalizado
-
-df_normalizado = bajando_procesando_df_normalizado()
-# df_normalizado = pd.read_csv('fuentes/df_pca_Normalizer.csv')
-
-
-variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
-variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-variable_list_municipio = list(input_datos['Lugar'].unique()) # Municipio seleccionado
-# variable_list_estado = list(input_datos['Estado'].unique()) # Estado seleccionado
-columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
-columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
-
-# Numéricas
-variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
-# Categóricas
-variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
-
-
-# Conectar a MongoDB con caché para los polígonos
 @st.cache_resource
 def connect_to_mongo(mongo_uri):
-    client = MongoClient(mongo_uri)
-    return client['Municipios_Rodrigo']
+    """Establece conexión a MongoDB para recursos"""
+    try:
+        client = MongoClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=20000,
+            socketTimeoutMS=20000
+        )
+        return client['Municipios_Rodrigo']
+    except Exception as e:
+        st.error(f"Error al conectar con MongoDB: {str(e)}")
+        st.stop()
 
-# Obtener el archivo GeoJSON desde MongoDB GridFS con caché
 @st.cache_data
-def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
-    fs = GridFS(_db)
-    file = fs.find_one({'filename': 'municipios.geojson'})
-    if file:
-        return file.read()
-    return None
+def consultando_base_de_datos(_db):
+    """Consulta GeoJSON de la base de datos"""
+    try:
+        fs = GridFS(_db)
+        file = fs.find_one({'filename': 'municipios.geojson'})
+        if file:
+            return file.read()
+        return None
+    except Exception as e:
+        st.error(f"Error al consultar GeoJSON: {str(e)}")
+        return None
 
-# Convertir los datos a GeoDataFrame
 def geojson_to_geodataframe(geojson_data):
-    return gpd.read_file(BytesIO(geojson_data))
+    """Convierte datos GeoJSON a GeoDataFrame"""
+    try:
+        return gpd.read_file(BytesIO(geojson_data))
+    except Exception as e:
+        st.error(f"Error al convertir GeoJSON: {str(e)}")
+        return None
 
-# Conectar a MongoDB
-db = connect_to_mongo(mongo_uri)
+# Ejecución principal
+try:
+    # Cargar datos principales
+    datos = bajando_procesando_datos()
+    input_datos = datos
 
-# Obtener el archivo GeoJSON
-geojson_data = consultando_base_de_datos(db)
+    # Procesar columnas específicas
+    datos['Operadores Escala Pequeña BAF'] = datos['operadores_escal_pequeña_baf']
+    datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
+    datos['Penetración BAF (Fibra)'] = datos['penetracion_baf_fibra']
+    datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
-# Convertir a GeoDataFrame si los datos fueron encontrados
-geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
+    # Cargar datasets adicionales
+    dataset_complete = bajando_procesando_datos_completos()
+    df = bajando_procesando_X_entrenamiento()
+    df_normalizado = bajando_procesando_df_normalizado()
 
-# Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
-if geojson is not None:
-    datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
-    datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
-    geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
+    # Procesar listas de variables
+    variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
+    variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
+    variable_list_municipio = list(input_datos['Lugar'].unique())
 
-    # Fusionar los datos con la geometría
-    dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
+    columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 
+                                'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 
+                                'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 
+                                'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
+    
+    columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 
+                                    'df3_Tipo de población', 'df4_Región', 'Municipio']
+
+    variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
+    variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
+
+    # Procesar datos geográficos
+    mongo_uri = os.getenv("MONGO_URI")
+    db = connect_to_mongo(mongo_uri)
+    geojson_data = consultando_base_de_datos(db)
+    geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
+
+    if geojson is not None:
+        datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
+        datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
+        geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
+        dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
+
+except Exception as e:
+    st.error(f"Error en la ejecución principal: {str(e)}")
+    st.stop()
 
 ###################################################################################################################
 ###################################################################################################################
