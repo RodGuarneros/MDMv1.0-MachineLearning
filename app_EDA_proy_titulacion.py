@@ -30,7 +30,7 @@ from bson import ObjectId
 # Page configuration
 st.set_page_config(
     page_title="Aprendizaje Automático para los Municipios de México",
-    page_icon="📱💻📶📊",
+    page_icon="📱",
     layout="wide",
     initial_sidebar_state="expanded")
 
@@ -103,7 +103,7 @@ def convert_objectid_to_str(document):
 
 # Función para cargar y procesar los datos con cache
 @st.cache_data
-def bajando_procesando_datos():
+def bajando_procesando_datos(ttl=3600):
     # Obtener la URI de MongoDB desde los secretos
     mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
