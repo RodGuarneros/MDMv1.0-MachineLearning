@@ -147,7 +147,7 @@ datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
 # OBTENIENDO EL DATASET COMPLETO:
 @st.cache_data
-def bajando_procesando_datos_completos():
+def bajando_procesando_datos_completos(ttl=3600):
     # Obtener la URI de MongoDB desde los secretos
     mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
@@ -172,7 +172,7 @@ dataset_complete = bajando_procesando_datos_completos()
 
 # OBTENIENDO X PARA EL TRAINING NORMALIZER:
 @st.cache_data
-def bajando_procesando_X_entrenamiento():
+def bajando_procesando_X_entrenamiento(ttl=3600):
     # Obtener la URI de MongoDB desde los secretos
     mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
@@ -194,7 +194,7 @@ df = bajando_procesando_X_entrenamiento()
 
 # OBTENIENDO DF PCA NORMALIZER:
 @st.cache_data
-def bajando_procesando_df_normalizado():
+def bajando_procesando_df_normalizado(ttl=3600):
     # Obtener la URI de MongoDB desde los secretos
     mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
     
@@ -235,7 +235,7 @@ def connect_to_mongo(mongo_uri):
 
 # Obtener el archivo GeoJSON desde MongoDB GridFS con caché
 @st.cache_data
-def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
+def consultando_base_de_datos(_db, ttl=3600):  # Cambiar 'db' a '_db' para evitar el error
     fs = GridFS(_db)
     file = fs.find_one({'filename': 'municipios.geojson'})
     if file:
