@@ -271,21 +271,19 @@ if geojson is not None:
 ###################################################################################################################
 
 # Sidebar
-with st.sidebar:
-    # st.title('Proyecto de Titulación <br> México')
-    st.markdown("<h3 style='text-align: center;'>MDM 1.0 - Aplicación Web <br>Madurez Digital en México</h3>", unsafe_allow_html=True)
-    st.sidebar.image("fuentes/mapa_mx.png", use_column_width=True)
-    st.markdown("""
-    <h5 style='text-align: center;'> 
-        Centro de Investigación e Innovación en TICs (INFOTEC)
-        <hr>
-        Aplicación elaborada por <br><br>
-        <a href='www.linkedin.com/in/guarneros' style='color: #51C622   ; text-decoration: none;'>Rodrigo Guarneros Gutiérrez</a>
-        <br><br> 
-        Para obtener el grado de Maestro en Ciencia de Datos e Información.
-        <hr> 
-        Asesor: Ph.D. Mario Graff Guerrero
-    </h5>
+st.markdown("""
+<h5 style='text-align: center;'> 
+    Centro de Investigación e Innovación en TICs (INFOTEC)
+    <hr>
+    Aplicación elaborada por <br><br>
+    <a href='https://www.linkedin.com/in/guarneros' style='color: #51C622; text-decoration: none;'>Rodrigo Guarneros Gutiérrez</a>        
+    <br><br> 
+    Para obtener el grado de Maestro en Ciencia de Datos e Información.
+    <hr> 
+    Asesor: <b> Ph.D. Mario Graff Guerrero </b>
+</h5>
+""", unsafe_allow_html=True)
+
     """, unsafe_allow_html=True)
     st.sidebar.image("fuentes/nube.png", use_column_width=True)
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -307,9 +305,9 @@ with st.sidebar:
 
     with st.expander('Enfoque de esta aplicación', expanded=False):
         st.write('''
-            - Se basa en un enfoque de <span style="color:#C2185B">"Programación Orientada a Objetos"</span>.
+            - Se basa en un enfoque de <span style="color:#51C622">"Programación Orientada a Objetos"</span>.
             - Los 2,456 municipios se puede modelar a partir de sus atributos y funciones que en escencia definen sus características y capacidades para aprovechar la revolución digital, respectivamente. 
-            - Este primer análisis exploratorio de la información disponible forma parte de un proyecto integral que busca: <span style="color:#C2185B">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
+            - Este primer análisis exploratorio de la información disponible forma parte de un proyecto integral que busca: <span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
             - Este aplicativo incluye atributos a nivel municipal tales como:
                 1. Número de viviendas. 
                 2. Grado educativo (Analfabetismo, Porcentaje de personas con educación básica, etc.).
@@ -318,7 +316,7 @@ with st.sidebar:
                 1. La distribución estadística de las variables. 
                 2. Relación entre las variables. 
                 3. La distribución geográfica de las variables.
-            - La ventaja de un panel de control como este consiste en sus <span style="color:#C2185B">economías de escala y la capacidad que tiene para presentar insights más profundos respecto a la población y sus funciones o actividades, tales como capacidad adquisitiva, preferencias, crédito al consumo, acceso a servicios de conectividad, empleo, sequías y hasta modelos predictivos.</span> 
+            - La ventaja de un panel de control como este consiste en sus <span style="color:#51C622">economías de escala y la capacidad que tiene para presentar insights más profundos respecto a la población y sus funciones o actividades, tales como capacidad adquisitiva, preferencias, crédito al consumo, acceso a servicios de conectividad, empleo, sequías y hasta modelos predictivos.</span> 
             ''', unsafe_allow_html=True)
 
 
@@ -1756,21 +1754,30 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Presentación", "Municipio", "Mad
 with tab1:
     # Expander con información adicional
     with st.expander('¿Para qué sirve esta aplicación?', expanded=False):
-        st.markdown(f'Provee un punto de referencia estadísticamente robusto, claro y preciso —con un criterio basado en aprendizaje automático y poder computacional, sin intervención humana, solo considerando las principales características de los municipios—, para efectos de que puedas ver dónde está cada municipio de México en su trayectoria hacia la <span style="color:#C2185B">"Madurez Digital"</span> y qué características debe considerar para favorecer su transición a la siguiente fase del ciclo de transformación digital.', unsafe_allow_html=True)
+        st.markdown(f'Provee un punto de referencia estadísticamente robusto, claro y preciso —con un criterio basado en aprendizaje automático y poder computacional, sin intervención humana, solo considerando las principales características de los municipios—, para efectos de que puedas ver dónde está cada municipio de México en su trayectoria hacia la <span style="color:#51C622">"Madurez Digital"</span> y qué características debe considerar para favorecer su transición a la siguiente fase del ciclo de transformación digital.', unsafe_allow_html=True)
 
         st.markdown(f'Permíteme compartir tres elementos que motivaron la creación de esta aplicación:', unsafe_allow_html=True)
         
         st.markdown(f'1. <span style="color:#51C622">La madurez digital</span> es multifactorial, incluye una combinación precisa de factores adicionales a los tradicionales como el acceso a Internet, los servicios de conectividad o dispositivos (socio-económicos, infraestructura y demográficos). Para algunos países, la plenitud digital requiere de la definición incluso de una canasta básica de productos digitales que cualquier hogar o ciudadano debe tener.', unsafe_allow_html=True)
 
-        st.markdown(f'<div style="text-aling: center;">Uno de mis libros favoritos, escrito por <span style="color:#51C622">Antoine Augustin Cournot</span> (1897, página <span style="color:#C2185B">24</span>) <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank"><em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em></a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en el sistema solar.', unsafe_allow_html=True)
-
-        st.markdown(f'3. La <span style="color:#C2185B">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#51C622">Diciembre 2024</span></span>: “does science need reference points?”), también sostiene que “…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.</div>', unsafe_allow_html=True)
+        st.markdown(f'''
+        <div style="text-align: center; padding-left: 40px;">
+            Uno de mis libros favoritos, escrito por 
+            <span style="color:#51C622">Antoine Augustin Cournot</span> (1897, página 
+            <span style="color:#51C622">24</span>) 
+            <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank">
+                <em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em>
+            </a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en el sistema solar.
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown(f'3. La <span style="color:#51C622">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#51C622">Diciembre 2024</span></span>: “does science need reference points?”), también sostiene que “…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.</div>', unsafe_allow_html=True)
 
         st.markdown(f'En este contexto, esta aplicación consiste en el marco de referencia para saber con precisión dónde están los municipios en su ciclo de madurez digital y describir el fenómeno.', unsafe_allow_html=True)
 
-        st.markdown(f'Esta aplicación es resultado de un <span style="color:#C2185B">modelo de aprendizaje automático no supervisado</span> seleccionado de entre <span style="color:#C2185B">450 modelos</span> y más de <span style="color:#C2185B">un millón de iteraciones</span> para cada evaluación, con el fin de obtener una clasificación eficiente y precisa sin ningún criterio ajeno a las <span style="color:#C2185B">181 características</span> medibles para cada municipio en México. Constituye un marco de referencia objetivo y preciso para ubicar al mununicipio de tu interés y compararlo con el total de municipios con miras a mejorar su madurez digital o conocer sus aptitudes para el desarrollo de negocios digitales. Asimismo, proporciona insights relevantes encuanto a la transición de un estado de madurez a otro y de las diferencias entre cada clasificación de municipios.', unsafe_allow_html=True)
+        st.markdown(f'Esta aplicación es resultado de un <span style="color:#51C622">modelo de aprendizaje automático no supervisado</span> seleccionado de entre <span style="color:#51C622">450 modelos</span> y más de <span style="color:#51C622">un millón de iteraciones</span> para cada evaluación, con el fin de obtener una clasificación eficiente y precisa sin ningún criterio ajeno a las <span style="color:#51C622">181 características</span> medibles para cada municipio en México. Constituye un marco de referencia objetivo y preciso para ubicar al mununicipio de tu interés y compararlo con el total de municipios con miras a mejorar su madurez digital o conocer sus aptitudes para el desarrollo de negocios digitales. Asimismo, proporciona insights relevantes encuanto a la transición de un estado de madurez a otro y de las diferencias entre cada clasificación de municipios.', unsafe_allow_html=True)
 
-        st.markdown(f'<div style="text-align: right;">Rodrigo Guarneros Gutiérrez<br><span style="color:#C2185B">Ciudad de México, 20.12.2024</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align: right;">Rodrigo Guarneros Gutiérrez<br><span style="color:#51C622">Ciudad de México, 20.12.2024</span></div>', unsafe_allow_html=True)
 
     with st.expander('¿Qué es la madurez digital?', expanded=False):
         st.markdown(f'En la inteligencia de negocios existen modelos de maduración para las organizaciones y empresas con el objeto de evaluar la toma decisiones basada en datos (Gartner 2004, AMR Research, Service Oriented Business Intelligence Maturirty Model (SOBIMM), entre otros descritos por <a href="https://aulavirtual.infotec.mx/pluginfile.php/115302/mod_label/intro/Medici%C3%B3n%20de%20Madurez%20en%20la%20Implementaci%C3%B3n%20de%20Inteligencia%20de%20Negocios.pdf" target="_blank"><b>Urbina Nájera y Medina-Barrera (2021)</b></a>), la Unión Europea desarrolló la metodología para evaluar la madurez digital de los gobiernos locales (<a href="https://data.europa.eu/en/news-events/news/lordimas-digital-maturity-assessment-tool-regions-and-cities" target="_blank"><b>LORDIMAS 2023, Digital Maturity Index for local governments</b></a>), no existe un enfoque único para evaluar la madurez digital de las regiones o localidades donde el ciudadano sea el objeto de estudio. No obstante, algunos países reconocen el papel de los servicios digitales y financieros como elementos fundamentales para hacer negocios y generar bienestar en una región. Por ello, han definido en sus estándares de desarrollo una canasta básica de bienes y servicios digitales.', unsafe_allow_html=True)
@@ -1872,23 +1879,23 @@ with tab3:
                 unsafe_allow_html=True)
             
             st.markdown(
-                f'- <span style="color:#51C622">El componente principal primario (PC1)</span>, que explica el 48.23% de la varianza en todos los datos, puede considerarse como un <span style="color:#C2185B">patrón o índice de actividad financiera</span>, asociado por orden de importancia a las siguientes características: (i) Ingresos promedio por vivienda; (ii) Terminales Punto de Venta (TPV); (iii) Transacciones con TPV de Banca Múltiple (BM); (iv) Transacciones en cajeros de BM; (v) Tarjetas de Débito; (vi) Ingresos promedio del sector comercial; (vii) Población Económicamente Activa (PEA); (viii) Cuentas Banca Popular; (ix) Cuentas de BM; (x) Transacciones N4 (personas de alto poder adquisitivo que prefieren servicios exclusivos sin límites de depósitos); (xi) Transacciones N3 (equivalentes a MX$81,112 pesos); (xii) Viviendas habitables, principalmente.',
+                f'- <span style="color:#51C622">El componente principal primario (PC1)</span>, que explica el 48.23% de la varianza en todos los datos, puede considerarse como un <span style="color:#51C622">patrón o índice de actividad financiera</span>, asociado por orden de importancia a las siguientes características: (i) Ingresos promedio por vivienda; (ii) Terminales Punto de Venta (TPV); (iii) Transacciones con TPV de Banca Múltiple (BM); (iv) Transacciones en cajeros de BM; (v) Tarjetas de Débito; (vi) Ingresos promedio del sector comercial; (vii) Población Económicamente Activa (PEA); (viii) Cuentas Banca Popular; (ix) Cuentas de BM; (x) Transacciones N4 (personas de alto poder adquisitivo que prefieren servicios exclusivos sin límites de depósitos); (xi) Transacciones N3 (equivalentes a MX$81,112 pesos); (xii) Viviendas habitables, principalmente.',
                 unsafe_allow_html=True)
             st.markdown(
                 f'- <span style="color:#51C622">Es significativo que el PC1 explique casi la mitad de la varianza total de los datos</span>, lo que sugiere que <b>la actividad financiera es el factor más diferenciador entre los municipios</b>.', unsafe_allow_html=True)
             
             st.markdown(
-                f'- <span style="color:#51C622">El segundo componente (PC2)</span>, que explica el 15% de la varianza en el total de los datos, se considera un <span style="color:#C2185B">patrón o índice de servicios digitales</span>. Está asociado por orden de importancia con las siguientes variables: (i) PEA; (ii) Ingresos promedio por vivienda; (iii) Viviendas habitables; (iv) Viviendas con TV; (v) Viviendas con celular; (vi) Viviendas con audio radiodifundido; (vii) Transacciones TPV BM; (viii) Ingresos promedio del sector comercial; (ix) Viviendas con TV de paga; (x) Viviendas con Internet; (xi) Ingresos promedio del sector manufacturero; (xii) Cuentas con capacidad móvil, entre otras.',
+                f'- <span style="color:#51C622">El segundo componente (PC2)</span>, que explica el 15% de la varianza en el total de los datos, se considera un <span style="color:#51C622">patrón o índice de servicios digitales</span>. Está asociado por orden de importancia con las siguientes variables: (i) PEA; (ii) Ingresos promedio por vivienda; (iii) Viviendas habitables; (iv) Viviendas con TV; (v) Viviendas con celular; (vi) Viviendas con audio radiodifundido; (vii) Transacciones TPV BM; (viii) Ingresos promedio del sector comercial; (ix) Viviendas con TV de paga; (x) Viviendas con Internet; (xi) Ingresos promedio del sector manufacturero; (xii) Cuentas con capacidad móvil, entre otras.',
                 unsafe_allow_html=True)
             st.markdown(
                 f'- <span style="color:#51C622">Es significativo que la PEA tenga el mayor de los pesos en el componente principal PCA2, sugiriendo <b>una fuerte relación entre la Población Económicamente Activa y los servicios digitiales</b></span>.', unsafe_allow_html=True)
             
             st.markdown(
-                f'- <span style="color:#51C622">El tercer componente (PC3)</span>, que explica el 8.32% de la varianza total, se considera un <span style="color:#C2185B">patrón o índice de adopción financiera</span>. Está asociado con las siguientes variables: (i) Transacciones TPV; (ii) Tarjetas de débito; (iii) Tarjetas de débito de Banca de Desarrollo; (iv) Cuentas de Banca Popular; (v) Cuentas de Cooperativas; (vi) PEA; (vii) Cuentas de Banca de Desarrollo; (viii) Cuentas N4; (ix) Cuentas de ahorro popular; (x) Cuentas de ahorro cooperativas; (xi) Viviendas habitables.',
+                f'- <span style="color:#51C622">El tercer componente (PC3)</span>, que explica el 8.32% de la varianza total, se considera un <span style="color:#51C622">patrón o índice de adopción financiera</span>. Está asociado con las siguientes variables: (i) Transacciones TPV; (ii) Tarjetas de débito; (iii) Tarjetas de débito de Banca de Desarrollo; (iv) Cuentas de Banca Popular; (v) Cuentas de Cooperativas; (vi) PEA; (vii) Cuentas de Banca de Desarrollo; (viii) Cuentas N4; (ix) Cuentas de ahorro popular; (x) Cuentas de ahorro cooperativas; (xi) Viviendas habitables.',
                 unsafe_allow_html=True)
 
             st.markdown(
-                f'- Mientras PC1 se centra en la actividad financiera general, PC3 captura específicamente la adopción de servicios financieros más específicos (banca popular, cooperativas, desarrollo) <span style="color:#C2185B">La presencia de diferentes tipos de cuentas y servicios financieros sugiere efectivamente un patrón de adopción más que de uso intensivo</span>.', unsafe_allow_html=True)
+                f'- Mientras PC1 se centra en la actividad financiera general, PC3 captura específicamente la adopción de servicios financieros más específicos (banca popular, cooperativas, desarrollo) <span style="color:#51C622">La presencia de diferentes tipos de cuentas y servicios financieros sugiere efectivamente un patrón de adopción más que de uso intensivo</span>.', unsafe_allow_html=True)
 
             st.markdown(
                 f'- <span style="color:#51C622">En conclusión, la visualización 3D nos permite ver que estos grupos no son completamente discretos sino que hay transiciones suaves entre ellos, lo que sugiere <b>una transición continua de desarrollo financiero-digital en los municipios mexicanos</b>.</span>', unsafe_allow_html=True)
