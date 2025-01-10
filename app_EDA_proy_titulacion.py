@@ -271,20 +271,15 @@ if geojson is not None:
 ###################################################################################################################
 
 # Sidebar
-st.markdown("""
-<h5 style='text-align: center;'> 
-    Centro de Investigación e Innovación en TICs (INFOTEC)
-    <hr>
-    Aplicación elaborada por <br><br>
-    <a href='https://www.linkedin.com/in/guarneros' style='color: #51C622; text-decoration: none;'>Rodrigo Guarneros Gutiérrez</a>        
-    <br><br> 
-    Para obtener el grado de Maestro en Ciencia de Datos e Información.
-    <hr> 
-    Asesor: <b> Ph.D. Mario Graff Guerrero </b>
-</h5>
-""", unsafe_allow_html=True)
-
-    """, unsafe_allow_html=True)
+    st.markdown(f'''
+    <div style="text-align: center; padding-left: 40px;">
+        Uno de mis libros favoritos, escrito por 
+        <span style="color:#51C622">Antoine Augustin Cournot</span> (1897, página 
+        <span style="color:#51C622">24</span>) 
+        <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank">
+            <em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em>
+        </a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en el sistema solar.
+    </div> ''', unsafe_allow_html=True)
     st.sidebar.image("fuentes/nube.png", use_column_width=True)
     st.markdown("<hr>", unsafe_allow_html=True)
 
