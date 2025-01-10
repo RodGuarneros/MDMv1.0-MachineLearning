@@ -308,7 +308,7 @@ with st.sidebar:
     with st.expander('Enfoque de esta aplicación', expanded=False):
         st.write('''
             - Se basa en un enfoque de <span style="color:#C2185B">"Programación Orientada a Objetos"</span>.
-            - La población se puede modelar a partir de sus atributos y funciones que en escencia definen sus características y capacidades para aprovechar la revolución digital, respectivamente. 
+            - Los 2,456 municipios se puede modelar a partir de sus atributos y funciones que en escencia definen sus características y capacidades para aprovechar la revolución digital, respectivamente. 
             - Este primer análisis exploratorio de la información disponible forma parte de un proyecto integral que busca: <span style="color:#C2185B">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
             - Este aplicativo incluye atributos a nivel municipal tales como:
                 1. Número de viviendas. 
@@ -1760,11 +1760,11 @@ with tab1:
 
         st.markdown(f'Permíteme compartir tres elementos que motivaron la creación de esta aplicación:', unsafe_allow_html=True)
         
-        st.markdown(f'1. <span style="color:#C2185B">La madurez digital</span> es multifactorial, incluye una combinación precisa de factores adicionales a los tradicionales como el acceso a Internet, los servicios de conectividad o dispositivos (socio-económicos, infraestructura y demográficos). Para algunos países, la plenitud digital requiere de la definición incluso de una canasta básica de productos digitales que cualquier hogar o ciudadano debe tener.', unsafe_allow_html=True)
+        st.markdown(f'1. <span style="color:#51C622">La madurez digital</span> es multifactorial, incluye una combinación precisa de factores adicionales a los tradicionales como el acceso a Internet, los servicios de conectividad o dispositivos (socio-económicos, infraestructura y demográficos). Para algunos países, la plenitud digital requiere de la definición incluso de una canasta básica de productos digitales que cualquier hogar o ciudadano debe tener.', unsafe_allow_html=True)
 
-        st.markdown(f'Uno de mis libros favoritos, escrito por <span style="color:#C2185B">Antoine Augustin Cournot</span> (1897, página <span style="color:#C2185B">24</span>) <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank"><em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em></a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en el sistema solar.', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-aling: center;">Uno de mis libros favoritos, escrito por <span style="color:#51C622">Antoine Augustin Cournot</span> (1897, página <span style="color:#C2185B">24</span>) <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank"><em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em></a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en el sistema solar.', unsafe_allow_html=True)
 
-        st.markdown(f'3. La <span style="color:#C2185B">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#C2185B">Diciembre 2024</span></span>: “does science need reference points?”), también sostiene que “…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.', unsafe_allow_html=True)
+        st.markdown(f'3. La <span style="color:#C2185B">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#51C622">Diciembre 2024</span></span>: “does science need reference points?”), también sostiene que “…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.</div>', unsafe_allow_html=True)
 
         st.markdown(f'En este contexto, esta aplicación consiste en el marco de referencia para saber con precisión dónde están los municipios en su ciclo de madurez digital y describir el fenómeno.', unsafe_allow_html=True)
 
@@ -1780,16 +1780,16 @@ with tab1:
         # Imagen
         st.image("fuentes/MDM_madurez1.png", caption="Modelo de Madurez Digital", use_column_width=True)
 
-        st.markdown(f'<b style="color:#5DE2E7">Etapa 1 (Inicial):</b> En esta etapa, los municipios tienen el desempeño más bajo en todas las variables relevantes identificadas.', unsafe_allow_html=True)
+        st.markdown(f'<b style="color:#51C622">Etapa 1 (Inicial):</b> En esta etapa, los municipios tienen el desempeño más bajo en todas las variables relevantes identificadas.', unsafe_allow_html=True)
         
-        st.markdown(f'<b style="color:#D20103">Etapa 2 (Desarrollo):</b> Los municipios tienen un avance en la dirección de más servicios digitales presentes con impacto en las variables de infraestructura, socio-económicos y demográficos.', unsafe_allow_html=True)
+        st.markdown(f'<b style="color:#51C622">Etapa 2 (Desarrollo):</b> Los municipios tienen un avance en la dirección de más servicios digitales presentes con impacto en las variables de infraestructura, socio-económicos y demográficos.', unsafe_allow_html=True)
 
-        st.markdown(f'<b style="color:#CC6CE7">Etapa 3 (Definición):</b> Claramente se trata de municipios con una penetración promedio en los servicios digitales y un ecosistema financiero más vibrante.', unsafe_allow_html=True)
+        st.markdown(f'<b style="color:#51C622">Etapa 3 (Definición):</b> Claramente se trata de municipios con una penetración promedio en los servicios digitales y un ecosistema financiero más vibrante.', unsafe_allow_html=True)
 
         st.markdown(f'<b style="color:#51C622">Etapa 4 (Optimización):</b> Los municipios alcanzan una mejor plenitud digital, se nota un balance en sus características que permiten mejor desempeño digital con beneficios tangibles para sus ciudadanos, generando un ecosistema propicio para los negocios digitales y el bienestar.', unsafe_allow_html=True)
 
     with st.expander('¿Cómo utilizar esta aplicación?', expanded=False):
-        st.markdown(f'Como se puede ver, se cuenta con 6 secciones adicionales:', unsafe_allow_html=True)
+        st.markdown(f'Como se puede ver, se cuenta con 5 secciones adicionales:', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Municipio:</b> Una vez seleccionado el municipio, aquí encontrarás su ubicación geográfica, la distribución de las variables de interés y el ranking de ese municipio en el <b style="color:#51C622">Índice de madurez</b> construido con base en el modelo de aprendizaje automático.', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Madurez digital:</b> Profundiza sobre lo que significa el ranking de madurez digital para el municipio seleccionado. Conoce cada uno de los componentes o índices que construyen el índice de madures digital y los principales patrones encontrados', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Estadísticas por Grupo:</b> Esta sección presenta un análisis exploratorio de datos para cada clúster. Aprende más sobre las características de los otros clústers y las principales características del clúster del municipio que seleccionaste', unsafe_allow_html=True)
@@ -1810,11 +1810,11 @@ with tab2:
     # Expander con información adicional
     with st.expander('Descripción', expanded=False):
         st.markdown(f'Esta sección incluye cuatro visualizaciones relevantes para conocer mejor al municipio seleccionado y el lugar que tiene en la clasificación realizada por nuestra máquina de inferencia estadística. Se sugiere analizar en el siguiente orden:', unsafe_allow_html=True)
-        st.markdown(f'- Conoce el índice de madurez digital del municipio seleccionado y comparalo con el del resto de los municipios de México con el Ranking presentado en la primera gráfica: <span style="color:#C2185B"> Gráfica de barras con el Índice de Madurez por Municipio, que resalta en rojo el municipio y el lugar que ocupa en el Ranking.</span>', unsafe_allow_html=True)
-        st.markdown(f'- Del lado derecho podrás encontrar la localización geográfica y el tipo de estado de madurez digital que tiene el municipio de acuerdo a su color: <span style="color:#C2185B"> La geografía y sus vecinos cercanos es importante, profundiza más en la sección "Geografía" de esta aplicación.</span>.', unsafe_allow_html=True)
-        st.markdown(f'- Justo después del mapa, podrás encontrar los estádisticos básicos de la distribución estadística del <span style="color:#C2185B"> Índice de Madurez Digital.</span> Visita el área de análisis de esta gráfica para conocer más.', unsafe_allow_html=True)
-        st.markdown(f'- Posteriormente, la siguiente gráfica: <span style="color:#C2185B"> Histograma por variable</span>, te permite conocer la distribución de alguna variable de interés y combinarlo con las variables categóricas disponibles.', unsafe_allow_html=True)
-        st.markdown(f'- Finalmente, ubica en qué lugar se encuentra tu municipio en esa variable de interés, comparado con los demás municipios: <span style="color:#C2185B"> Diagrama de caja</span>, que permite revisar a profundidad cuál es el rezago del municipio de interés en esa métrica específica.', unsafe_allow_html=True)
+        st.markdown(f'- Conoce el índice de madurez digital del municipio seleccionado y comparalo con el del resto de los municipios de México con el Ranking presentado en la primera gráfica: <span style="color:#51C622"> Gráfica de barras con el Índice de Madurez por Municipio, que resalta en rojo el municipio y el lugar que ocupa en el Ranking.</span>', unsafe_allow_html=True)
+        st.markdown(f'- Del lado derecho podrás encontrar la localización geográfica y el tipo de estado de madurez digital que tiene el municipio de acuerdo a su color: <span style="color:#51C622"> La geografía y sus vecinos cercanos es importante, profundiza más en la sección "Geografía" de esta aplicación.</span>.', unsafe_allow_html=True)
+        st.markdown(f'- Justo después del mapa, podrás encontrar los estádisticos básicos de la distribución estadística del <span style="color:#51C622"> Índice de Madurez Digital.</span> Visita el área de análisis de esta gráfica para conocer más.', unsafe_allow_html=True)
+        st.markdown(f'- Posteriormente, la siguiente gráfica: <span style="color:#51C622"> Histograma por variable</span>, te permite conocer la distribución de alguna variable de interés y combinarlo con las variables categóricas disponibles.', unsafe_allow_html=True)
+        st.markdown(f'- Finalmente, ubica en qué lugar se encuentra tu municipio en esa variable de interés, comparado con los demás municipios: <span style="color:#51C622"> Diagrama de caja</span>, que permite revisar a profundidad cuál es el rezago del municipio de interés en esa métrica específica.', unsafe_allow_html=True)
     
     # Crear dos columnas principales con proporción 4:6 para dar más espacio al mapa
     col_izq, col_der = st.columns([6, 6])
@@ -1848,9 +1848,9 @@ with tab3:
         """
         <div style="text-align: justify;">
             Maximiza la página para visualizar los tres Componentes Principales y sus patrones identificados. Visualiza cómo se complementan entre sí: <br>
-            - PC1 <span style="color:#C2185B; font-weight:bold;">- Actividad financiera (volumen/intensidad);</span> <br>
-            - PC2 <span style="color:#C2185B; font-weight:bold;">- Servicios digitales (infraestructura/acceso), y</span> <br>
-            - PC3 <span style="color:#C2185B; font-weight:bold;">- Adopción financiera (diversificación/inclusión).</span> <br>
+            - PC1 <span style="color:#51C622; font-weight:bold;">- Actividad financiera (volumen/intensidad);</span> <br>
+            - PC2 <span style="color:#51C622; font-weight:bold;">- Servicios digitales (infraestructura/acceso), y</span> <br>
+            - PC3 <span style="color:#51C622; font-weight:bold;">- Adopción financiera (diversificación/inclusión).</span> <br>
             Con esta metodología se proporciona una visión muy completa del desarrollo financiero y digital de los municipios.
         </div>
         """,
@@ -1864,7 +1864,7 @@ with tab3:
         # Gráfico 3D en toda la columna 1
         with st.expander('El significado de cada Componente Principal', expanded=False):            
             st.markdown(
-                f'<span style="color:#C2185B">Los componentes principales (PC1, PC2 y PC3) buscan maximizar la suma de las distancias al cuadrado entre los puntos proyectados y el origen</span>. Su resultado es una combinación lineal de todas las variables que los conforman. Así, la descomposición en valores singulares (SVD) nos permite visualizar en la gráfica la proyección de cada una de las combinaciones lineales en los municipios, representados en un espacio vectorial que va de -1 a 1 en cada eje del gráfico tridimensional.',
+                f'<span style="color:#51C622">Los componentes principales (PC1, PC2 y PC3) buscan maximizar la suma de las distancias al cuadrado entre los puntos proyectados y el origen</span>. Su resultado es una combinación lineal de todas las variables que los conforman. Así, la descomposición en valores singulares (SVD) nos permite visualizar en la gráfica la proyección de cada una de las combinaciones lineales en los municipios, representados en un espacio vectorial que va de -1 a 1 en cada eje del gráfico tridimensional.',
                 unsafe_allow_html=True)
             
             st.markdown(
@@ -1872,26 +1872,26 @@ with tab3:
                 unsafe_allow_html=True)
             
             st.markdown(
-                f'- <span style="color:#C2185B">El componente principal primario (PC1)</span>, que explica el 48.23% de la varianza en todos los datos, puede considerarse como un <span style="color:#C2185B">patrón o índice de actividad financiera</span>, asociado por orden de importancia a las siguientes características: (i) Ingresos promedio por vivienda; (ii) Terminales Punto de Venta (TPV); (iii) Transacciones con TPV de Banca Múltiple (BM); (iv) Transacciones en cajeros de BM; (v) Tarjetas de Débito; (vi) Ingresos promedio del sector comercial; (vii) Población Económicamente Activa (PEA); (viii) Cuentas Banca Popular; (ix) Cuentas de BM; (x) Transacciones N4 (personas de alto poder adquisitivo que prefieren servicios exclusivos sin límites de depósitos); (xi) Transacciones N3 (equivalentes a MX$81,112 pesos); (xii) Viviendas habitables, principalmente.',
+                f'- <span style="color:#51C622">El componente principal primario (PC1)</span>, que explica el 48.23% de la varianza en todos los datos, puede considerarse como un <span style="color:#C2185B">patrón o índice de actividad financiera</span>, asociado por orden de importancia a las siguientes características: (i) Ingresos promedio por vivienda; (ii) Terminales Punto de Venta (TPV); (iii) Transacciones con TPV de Banca Múltiple (BM); (iv) Transacciones en cajeros de BM; (v) Tarjetas de Débito; (vi) Ingresos promedio del sector comercial; (vii) Población Económicamente Activa (PEA); (viii) Cuentas Banca Popular; (ix) Cuentas de BM; (x) Transacciones N4 (personas de alto poder adquisitivo que prefieren servicios exclusivos sin límites de depósitos); (xi) Transacciones N3 (equivalentes a MX$81,112 pesos); (xii) Viviendas habitables, principalmente.',
                 unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Es significativo que el PC1 explique casi la mitad de la varianza total de los datos</span>, lo que sugiere que <b>la actividad financiera es el factor más diferenciador entre los municipios</b>.', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Es significativo que el PC1 explique casi la mitad de la varianza total de los datos</span>, lo que sugiere que <b>la actividad financiera es el factor más diferenciador entre los municipios</b>.', unsafe_allow_html=True)
             
             st.markdown(
-                f'- <span style="color:#C2185B">El segundo componente (PC2)</span>, que explica el 15% de la varianza en el total de los datos, se considera un <span style="color:#C2185B">patrón o índice de servicios digitales</span>. Está asociado por orden de importancia con las siguientes variables: (i) PEA; (ii) Ingresos promedio por vivienda; (iii) Viviendas habitables; (iv) Viviendas con TV; (v) Viviendas con celular; (vi) Viviendas con audio radiodifundido; (vii) Transacciones TPV BM; (viii) Ingresos promedio del sector comercial; (ix) Viviendas con TV de paga; (x) Viviendas con Internet; (xi) Ingresos promedio del sector manufacturero; (xii) Cuentas con capacidad móvil, entre otras.',
+                f'- <span style="color:#51C622">El segundo componente (PC2)</span>, que explica el 15% de la varianza en el total de los datos, se considera un <span style="color:#C2185B">patrón o índice de servicios digitales</span>. Está asociado por orden de importancia con las siguientes variables: (i) PEA; (ii) Ingresos promedio por vivienda; (iii) Viviendas habitables; (iv) Viviendas con TV; (v) Viviendas con celular; (vi) Viviendas con audio radiodifundido; (vii) Transacciones TPV BM; (viii) Ingresos promedio del sector comercial; (ix) Viviendas con TV de paga; (x) Viviendas con Internet; (xi) Ingresos promedio del sector manufacturero; (xii) Cuentas con capacidad móvil, entre otras.',
                 unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Es significativo que la PEA tenga el mayor de los pesos en el componente principal PCA2, sugiriendo <b>una fuerte relación entre la Población Económicamente Activa y los servicios digitiales</b></span>.', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Es significativo que la PEA tenga el mayor de los pesos en el componente principal PCA2, sugiriendo <b>una fuerte relación entre la Población Económicamente Activa y los servicios digitiales</b></span>.', unsafe_allow_html=True)
             
             st.markdown(
-                f'- <span style="color:#C2185B">El tercer componente (PC3)</span>, que explica el 8.32% de la varianza total, se considera un <span style="color:#C2185B">patrón o índice de adopción financiera</span>. Está asociado con las siguientes variables: (i) Transacciones TPV; (ii) Tarjetas de débito; (iii) Tarjetas de débito de Banca de Desarrollo; (iv) Cuentas de Banca Popular; (v) Cuentas de Cooperativas; (vi) PEA; (vii) Cuentas de Banca de Desarrollo; (viii) Cuentas N4; (ix) Cuentas de ahorro popular; (x) Cuentas de ahorro cooperativas; (xi) Viviendas habitables.',
+                f'- <span style="color:#51C622">El tercer componente (PC3)</span>, que explica el 8.32% de la varianza total, se considera un <span style="color:#C2185B">patrón o índice de adopción financiera</span>. Está asociado con las siguientes variables: (i) Transacciones TPV; (ii) Tarjetas de débito; (iii) Tarjetas de débito de Banca de Desarrollo; (iv) Cuentas de Banca Popular; (v) Cuentas de Cooperativas; (vi) PEA; (vii) Cuentas de Banca de Desarrollo; (viii) Cuentas N4; (ix) Cuentas de ahorro popular; (x) Cuentas de ahorro cooperativas; (xi) Viviendas habitables.',
                 unsafe_allow_html=True)
 
             st.markdown(
                 f'- Mientras PC1 se centra en la actividad financiera general, PC3 captura específicamente la adopción de servicios financieros más específicos (banca popular, cooperativas, desarrollo) <span style="color:#C2185B">La presencia de diferentes tipos de cuentas y servicios financieros sugiere efectivamente un patrón de adopción más que de uso intensivo</span>.', unsafe_allow_html=True)
 
             st.markdown(
-                f'- <span style="color:#C2185B">En conclusión, la visualización 3D nos permite ver que estos grupos no son completamente discretos sino que hay transiciones suaves entre ellos, lo que sugiere <b>una transición continua de desarrollo financiero-digital en los municipios mexicanos</b>.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">En conclusión, la visualización 3D nos permite ver que estos grupos no son completamente discretos sino que hay transiciones suaves entre ellos, lo que sugiere <b>una transición continua de desarrollo financiero-digital en los municipios mexicanos</b>.</span>', unsafe_allow_html=True)
 
 
 
@@ -1903,11 +1903,11 @@ with tab3:
         with st.expander('Patrones en los clústers', expanded=False):
             st.markdown(f'La separación entre clusters tiene mejor visibilidad en tres dimensiones, en general se puede decir que:', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">El clúster de los municipios en desarrollo (color rojo) es el más numeroso y disperso.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">El clúster de los municipios en desarrollo (color rojo) es el más numeroso y disperso.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Los clústers Inicial (turquesa) y Definición (morado) muestran una cohesión interna mucho mayor.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Los clústers Inicial (turquesa) y Definición (morado) muestran una cohesión interna mucho mayor.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">El clúster con los municipios en fase de Optimización (color verde) es el más compacto y diferenciado.</span>', unsafe_allow_html=True) 
+                f'- <span style="color:#51C622">El clúster con los municipios en fase de Optimización (color verde) es el más compacto y diferenciado.</span>', unsafe_allow_html=True) 
         st.plotly_chart(grafico2d1, use_container_width=True, height=250)
 
     with col2:
@@ -1915,19 +1915,19 @@ with tab3:
 
         with st.expander('Estructura de los clústers', expanded=False):
             st.markdown(f'Esta segmentación, resultado de las similitudes en las 81 características de los municipios que propone la reducción dimensional, sugiere una clara estratificación de los municipios basada principalmente en su nivel de desarrollo financiero y económico, con subdivisiones adicionales basadas en infraestructura y acceso a servicios financieros especializados.', unsafe_allow_html=True)
-            st.markdown(f'En cuanto a la estructura de los clústers, se puede ver lo siguiente: <span style="color:#C2185B">(i) Se identifican 4 grupos claramente diferenciados (clústers Inicio, En desarrollo, Definición y Optimización); (ii) la visualización en 2D y 3D muestra que estos grupos tienen fronteras relativamente bien definidas, y (iii) hay cierto solapamiento en las zonas de transición entre clústers, lo cual es natural en datos municipales que pueden compartir características</span>', unsafe_allow_html=True)
-            st.markdown(f'La distribución espacial en los clústers es también importante: <span style="color:#C2185B">(i) el PCA1 (eje horizontal) explica la mayor variación, abarcando aproximadamente de -0.6 a 0.8; (ii) el PCA2 muestra una dispersión menor, aproximadamente de -0.5 a 0.5, y (iii) el PCA3 añade una dimensión adicional que ayuda a separar mejor algunos grupos que parecían solapados en 2D </span>.', unsafe_allow_html=True)
+            st.markdown(f'En cuanto a la estructura de los clústers, se puede ver lo siguiente: <span style="color:#51C622">(i) Se identifican 4 grupos claramente diferenciados (clústers Inicio, En desarrollo, Definición y Optimización); (ii) la visualización en 2D y 3D muestra que estos grupos tienen fronteras relativamente bien definidas, y (iii) hay cierto solapamiento en las zonas de transición entre clústers, lo cual es natural en datos municipales que pueden compartir características</span>', unsafe_allow_html=True)
+            st.markdown(f'La distribución espacial en los clústers es también importante: <span style="color:#51C622">(i) el PCA1 (eje horizontal) explica la mayor variación, abarcando aproximadamente de -0.6 a 0.8; (ii) el PCA2 muestra una dispersión menor, aproximadamente de -0.5 a 0.5, y (iii) el PCA3 añade una dimensión adicional que ayuda a separar mejor algunos grupos que parecían solapados en 2D </span>.', unsafe_allow_html=True)
         st.plotly_chart(grafico2d2, use_container_width=True, height=250)
 
         with st.expander('Perfil del municipio en cada clúster', expanded=False):
             st.markdown(f'El Clúster Inicial (turquesa) tiene las siguientes características:', unsafe_allow_html=True)
 
             st.markdown(
-                f'- <span style="color:#C2185B">Bajo en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Bajo en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Bajo/Medio en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Bajo/Medio en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Bajo en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+                f'- <span style="color:#51C622">Bajo en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
             st.markdown(
                 f'<b>Interpretación: Municipios con menor desarrollo financiero y digital, rurales o semi-urbanos con oportunidades de desarrollo en los tres aspectos. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b></span>', unsafe_allow_html=True) 
 
@@ -1935,22 +1935,22 @@ with tab3:
             st.markdown(f'El Clúster en desarrollo (rojo) tiene las siguientes características:', unsafe_allow_html=True)
 
             st.markdown(
-                f'- <span style="color:#C2185B">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Bajo en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Bajo en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Bajo/medio en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+                f'- <span style="color:#51C622">Bajo/medio en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
             st.markdown(
                 f'<b>Interpretación: Municipios con alta actividad financiera pero con brechas en infraestructura digital. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b></span>.', unsafe_allow_html=True) 
 
             st.markdown(f'El Clúster en la fase de definición (morado) tiene las siguientes características:', unsafe_allow_html=True)
 
             st.markdown(
-                f'- <span style="color:#C2185B">Valores medios en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Valores medios en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Dispersión amplia en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Dispersión amplia en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Variaciión en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+                f'- <span style="color:#51C622">Variaciión en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
             st.markdown(
                 f'<b>Interpretación: Municipios en transición, con niveles moderados de actividad financiera y desarrollo variable en servicios digitales.</b></span>', unsafe_allow_html=True) 
 
@@ -1958,11 +1958,11 @@ with tab3:
 
             st.markdown(f'El Clúster en la fase de optimización (verde) tiene las siguientes características:', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Alto en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Alto en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#C2185B">Medio/alto en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+                f'- <span style="color:#51C622">Medio/alto en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
             st.markdown(
                 f'<b>Interpretación: Municipios urbanos y semi-urbanos altamente desarrollados con buena infraestructura digital y alto nivel de actividad financiera.</b></span>', unsafe_allow_html=True)
 
@@ -2004,7 +2004,7 @@ with tab5:
     with st.expander('Análisis', expanded=False):
         # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
         st.markdown(f'Los diagramas de dispersión permiten visualizar las relaciones lineales y no lineales de las variables.', unsafe_allow_html=True)
-        st.markdown(f'<span style="color:#C2185B">Se trata de un primer acercamiento <span style="color:#C2185B">donde es importante recordar que una alta correlación no necesariamente implica causalidad.</span>', unsafe_allow_html=True)
+        st.markdown(f'<span style="color:#51C622">Se trata de un primer acercamiento <span style="color:#51C622">donde es importante recordar que una alta correlación no necesariamente implica causalidad.</span>', unsafe_allow_html=True)
         st.markdown(f'Vale la pena recordar que la R² ajustada se interpreta como el porcentaje de la varianza de la variable dependiente (eje de las Y) que es explicada por la variable independiente (eje de las X).  La R² ajustada es una medida de la bondad de ajuste de un modelo de regresión lineal. Representa el porcentaje de la varianza de la variable dependiente (eje Y) que es explicada por la variable independiente (eje X) después de ajustar el modelo para tener en cuenta el número de predictores en el modelo y el tamaño de la muestra. En otras palabras, la R² ajustada penaliza la inclusión de términos en el modelo que no mejoran significativamente la capacidad predictiva', unsafe_allow_html=True)
     st.plotly_chart(fig_scatter, use_container_width=True, height=500)
 
