@@ -99,120 +99,154 @@ st.markdown("""
 # Cargar variables de entorno
 
 # Función para convertir ObjectId a str
-
 def convert_objectid_to_str(document):
-    """Convierte todos los ObjectId en un documento a string"""
     for key, value in document.items():
         if isinstance(value, ObjectId):
             document[key] = str(value)
     return document
 
-# Función para cargar y procesar los datos con cache
+# Función para cargar y procesar los datos con caché
 @st.cache_data
 def bajando_procesando_datos():
-    """Carga y procesa los datos desde MongoDB con optimización de proyección y filtrado"""
-    # Obtener la URI de MongoDB desde los secretos
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    
-    # Conexión a MongoDB usando la URI desde los secretos
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['datos_finales']
+    try:
+        # Obtener la URI de MongoDB desde los secretos
+        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+        
+        # Conexión a MongoDB usando la URI desde los secretos
+        client = MongoClient(mongo_uri)
+        db = client['Municipios_Rodrigo']
+        collection = db['datos_finales']
 
-    # Proyección para obtener solo las columnas necesarias
-    columns_to_exclude_numeric = ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 0.2','cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio', 'Cluster2']
-    columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio', '_id']
+        # Obtener todos los documentos de la colección y convertir ObjectId a str
+        datos_raw = collection.find()
+        
+        # Procesar los datos y convertir el ObjectId a string
+        datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
 
-    # Obtener solo las columnas necesarias, excluyendo las que no necesitamos
-    projection = {col: 1 for col in collection.find_one().keys() if col not in columns_to_exclude_numeric + columns_to_exclude_categorical}
-    
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find({}, projection)
-    datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+        # Asegurarse de que los datos sean interpretados correctamente en Latin1
+        for column in datos.select_dtypes(include=['object']).columns:
+            datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
 
-    # Asegurarse de que los datos sean interpretados correctamente en Latin1
-    for column in datos.select_dtypes(include=['object']).columns:
-        datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
+        # Limpiar los nombres de las columnas eliminando espacios
+        datos.columns = datos.columns.str.strip()
 
-    # Limpiar los nombres de las columnas eliminando espacios
-    datos.columns = datos.columns.str.strip()
+        # Verifica si la columna 'Madurez' existe antes de convertirla
+        if 'Madurez' in datos.columns:
+            datos['Madurez'] = datos['Madurez'].astype('category')
+        else:
+            st.write("La columna 'Madurez' no existe en los datos.")
 
-    return datos
+        # Verifica si 'Etapa_Madurez' existe y créala si es necesario
+        if 'Etapa_Madurez' in datos.columns:
+            datos['Madurez'] = datos['Etapa_Madurez'].astype('category')
 
-# Conectar a MongoDB con caché para los polígonos
+        return datos
+
+    except Exception as e:
+        st.error(f"Hubo un error al consultar la base de datos: {e}")
+        raise
+
+# Función para cargar los datos de la colección completa
+@st.cache_data
+def bajando_procesando_datos_completos():
+    try:
+        # Obtener la URI de MongoDB desde los secretos
+        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+        
+        # Conexión a MongoDB usando la URI desde los secretos
+        client = MongoClient(mongo_uri)
+        db = client['Municipios_Rodrigo']
+        collection = db['completo']
+
+        # Obtener todos los documentos de la colección y convertir ObjectId a str
+        datos_raw = collection.find()
+        
+        # Procesar los datos y convertir el ObjectId a string
+        dataset_complete = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+        # Limpiar los nombres de las columnas eliminando espacios
+        dataset_complete.columns = dataset_complete.columns.str.strip()
+
+        return dataset_complete
+
+    except Exception as e:
+        st.error(f"Hubo un error al consultar la base de datos: {e}")
+        raise
+
+# Función para cargar X para el training normalizer
+@st.cache_data
+def bajando_procesando_X_entrenamiento():
+    try:
+        # Obtener la URI de MongoDB desde los secretos
+        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+        
+        # Conexión a MongoDB usando la URI desde los secretos
+        client = MongoClient(mongo_uri)
+        db = client['Municipios_Rodrigo']
+        collection = db['X_for_training_normalizer']
+
+        # Obtener todos los documentos de la colección y convertir ObjectId a str
+        datos_raw = collection.find()
+        
+        # Procesar los datos y convertir el ObjectId a string
+        df = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+        # Limpiar los nombres de las columnas eliminando espacios
+        df.columns = df.columns.str.strip()
+
+        return df
+
+    except Exception as e:
+        st.error(f"Hubo un error al consultar la base de datos: {e}")
+        raise
+
+# Función para cargar el DataFrame normalizado
+@st.cache_data
+def bajando_procesando_df_normalizado():
+    try:
+        # Obtener la URI de MongoDB desde los secretos
+        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+        
+        # Conexión a MongoDB usando la URI desde los secretos
+        client = MongoClient(mongo_uri)
+        db = client['Municipios_Rodrigo']
+        collection = db['df_pca_norm']
+
+        # Obtener todos los documentos de la colección y convertir ObjectId a str
+        datos_raw = collection.find()
+        
+        # Procesar los datos y convertir el ObjectId a string
+        df_normalizado = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+        # Limpiar los nombres de las columnas eliminando espacios
+        df_normalizado.columns = df_normalizado.columns.astype(str).str.strip()
+
+        return df_normalizado
+
+    except Exception as e:
+        st.error(f"Hubo un error al consultar la base de datos: {e}")
+        raise
+
+# Función para conectarse a MongoDB y obtener el archivo GeoJSON
 @st.cache_resource
 def connect_to_mongo(mongo_uri):
-    """Conexión a la base de datos MongoDB"""
     client = MongoClient(mongo_uri)
     return client['Municipios_Rodrigo']
 
-# Obtener el archivo GeoJSON desde MongoDB GridFS con caché
+# Función para obtener el archivo GeoJSON desde GridFS
 @st.cache_data
-def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
-    """Consulta el archivo GeoJSON desde MongoDB GridFS"""
+def consultando_base_de_datos(_db):
     fs = GridFS(_db)
     file = fs.find_one({'filename': 'municipios.geojson'})
     if file:
         return file.read()
     return None
 
-# Convertir los datos a GeoDataFrame
+# Función para convertir el archivo GeoJSON en un GeoDataFrame
 def geojson_to_geodataframe(geojson_data):
-    """Convierte los datos GeoJSON a un GeoDataFrame"""
     return gpd.read_file(BytesIO(geojson_data))
 
-# Función para cargar y procesar el dataset completo
-@st.cache_data
-def bajando_procesando_datos_completos():
-    """Carga el dataset completo desde MongoDB"""
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['completo']
-
-    datos_raw = collection.find()
-    dataset_complete = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-
-    for column in dataset_complete.select_dtypes(include=['object']).columns:
-        dataset_complete[column] = dataset_complete[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
-
-    dataset_complete.columns = dataset_complete.columns.str.strip()
-
-    return dataset_complete
-
-# Función para cargar X para el training normalizer
-@st.cache_data
-def bajando_procesando_X_entrenamiento():
-    """Carga el dataset X_for_training_normalizer desde MongoDB"""
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['X_for_training_normalizer']
-
-    datos_raw = collection.find()
-    df = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-
-    df.columns = df.columns.str.strip()
-
-    return df
-
-# Función para cargar el dataframe normalizado (PCA)
-@st.cache_data
-def bajando_procesando_df_normalizado():
-    """Carga el dataframe df_pca_norm desde MongoDB"""
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['df_pca_norm']
-
-    datos_raw = collection.find()
-    df_normalizado = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-
-    df_normalizado.columns = df_normalizado.columns.astype(str).str.strip()
-
-    return df_normalizado
-
-# Llamar a las funciones para cargar los datos y el geojson
+# Cargar los datos desde MongoDB
 mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
 db = connect_to_mongo(mongo_uri)
 
@@ -222,23 +256,16 @@ geojson_data = consultando_base_de_datos(db)
 # Convertir a GeoDataFrame si los datos fueron encontrados
 geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
 
-# Cargar y procesar los datos
-datos = bajando_procesando_datos()
-
-input_datos = datos
-
-# Obtener el dataset completo
+# Cargar los datasets completos
 dataset_complete = bajando_procesando_datos_completos()
-
-# Obtener el dataset X para el normalizer
 df = bajando_procesando_X_entrenamiento()
-
-# Obtener el dataframe PCA normalizado
 df_normalizado = bajando_procesando_df_normalizado()
 
-# Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
+# Cargar los datos procesados
+datos = bajando_procesando_datos()
+input_datos = datos
+# Realizar la fusión de los datos si el GeoDataFrame está disponible
 if geojson is not None:
-    # Asegurarse de que las claves para la fusión estén en el formato adecuado
     datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
     datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
     geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
@@ -246,20 +273,8 @@ if geojson is not None:
     # Fusionar los datos con la geometría
     dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
 
-else:
-    st.write("No se pudo encontrar el archivo GeoJSON.")
-
-# Procesamiento de variables numéricas y categóricas
-variable_list_numerica = list(datos.select_dtypes(include=['int64', 'float64']).columns)
-variable_list_categoricala = list(datos.select_dtypes(include=['object', 'category']).columns)
-
-columns_to_exclude_numeric = ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 0.2', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio', 'Cluster2']
-columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio', '_id']
-
-# Filtrar las variables numéricas y categóricas, excluyendo las columnas mencionadas
-variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
-variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
-
+# Para la aplicación, puedes procesar las columnas que necesitas a partir de 'datos'
+# y luego mostrarlas o utilizarlas como desees.
 
 
 # def convert_objectid_to_str(document):
