@@ -95,14 +95,6 @@ st.markdown("""
 # Conectar con MongoDB
 
 # Cargar variables de entorno
-
-import pandas as pd
-from pymongo import MongoClient
-import streamlit as st
-from bson import ObjectId
-from gridfs import GridFS
-
-# Función para convertir ObjectId a str
 def convert_objectid_to_str(document):
     """Convierte todos los ObjectId en un documento a string"""
     for key, value in document.items():
@@ -153,18 +145,39 @@ input_datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
 datos = input_datos
 
-# Procesamiento de variables numéricas y categóricas
-variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
-variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
+# Cargar el archivo GeoJSON desde MongoDB (si existe)
+@st.cache_data
+def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
+    fs = GridFS(_db)
+    file = fs.find_one({'filename': 'municipios.geojson'})
+    if file:
+        return file.read()
+    return None
 
-columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
-columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
+# Convertir los datos GeoJSON a GeoDataFrame
+def geojson_to_geodataframe(geojson_data):
+    return gpd.read_file(BytesIO(geojson_data))
 
-# Numéricas
-variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
-# Categóricas
-variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
+# Conectar a MongoDB y obtener el archivo GeoJSON
+mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+db = connect_to_mongo()
+geojson_data = consultando_base_de_datos(db)
+
+# Convertir el archivo GeoJSON a GeoDataFrame si existe
+geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
+
+# Verifica si el GeoDataFrame y datos existen para realizar la fusión
+if geojson is not None:
+    # Asegurarnos de que 'cvegeo' esté bien en ambas bases de datos
+    input_datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
+    input_datos['CVEGEO'] = input_datos['CVEGEO'].astype(str).str.zfill(5)
+    geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
+
+    # Fusionar los datos con la geometría
+    dataset_complete_geometry = input_datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
+else:
+    st.write("No se pudo encontrar el archivo GeoJSON.")
+
 
 # def convert_objectid_to_str(document):
 #     for key, value in document.items():
