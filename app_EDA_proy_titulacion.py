@@ -26,6 +26,8 @@ from io import BytesIO
 from dotenv import load_dotenv
 import os
 from bson import ObjectId
+from concurrent.futures import ThreadPoolExecutor
+
 
 # Page configuration
 st.set_page_config(
@@ -104,71 +106,76 @@ def convert_objectid_to_str(document):
             document[key] = str(value)
     return document
 
-# Conexión a MongoDB (única para todas las colecciones)
-@st.cache_resource
-def connect_to_mongo():
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    client = MongoClient(mongo_uri)
-    return client['Municipios_Rodrigo']
-
-# Función para cargar cualquier colección de MongoDB y convertir los datos en DataFrame
+# Función para cargar y procesar los datos con caché
 @st.cache_data
-def cargar_datos(collection_name):
-    """Carga y procesa los datos de una colección específica de MongoDB"""
-    db = connect_to_mongo()
+def bajando_procesando_datos(collection_name):
+    """Carga y procesa los datos desde MongoDB usando caché para optimizar el rendimiento"""
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    
+    # Conexión a MongoDB usando la URI desde los secretos
+    client = MongoClient(mongo_uri)
+    db = client['Municipios_Rodrigo']
     collection = db[collection_name]
-    
-    # Obtener los datos de la colección
-    datos_raw = collection.find()
-    
-    # Convertir los datos a DataFrame y aplicar la conversión de ObjectId
-    datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
 
-    # Limpiar nombres de las columnas
-    datos.columns = datos.columns.str.strip()
+    # Obtener los documentos de la colección y convertir ObjectId a str
+    datos_raw = collection.find()
+    datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
 
     # Asegurarse de que los datos sean interpretados correctamente en Latin1
     for column in datos.select_dtypes(include=['object']).columns:
         datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
 
+    # Limpiar los nombres de las columnas eliminando espacios
+    datos.columns = datos.columns.str.strip()
+
     return datos
 
-# Cargar los 4 datasets desde MongoDB
-input_datos = cargar_datos('datos_finales')
-dataset_complete = cargar_datos('completo')
-X_for_training_normalizer = cargar_datos('X_for_training_normalizer')
-df_pca_norm = cargar_datos('df_pca_norm')
+# Consultar las colecciones en paralelo usando ThreadPoolExecutor
+@st.cache_data
+def obtener_datos_parallel():
+    """Obtiene los datos de las colecciones de MongoDB en paralelo"""
+    collections = ['datos_finales', 'completo', 'X_for_training_normalizer', 'df_pca_norm']
+    with ThreadPoolExecutor() as executor:
+        datos_list = list(executor.map(bajando_procesando_datos, collections))
+    
+    # Asignar los resultados a variables
+    input_datos, dataset_complete, X_for_training_normalizer, df_pca_norm = datos_list
+    return input_datos, dataset_complete, X_for_training_normalizer, df_pca_norm
 
-# Procesar las columnas específicas
+# Llamar a la función de consulta paralela
+input_datos, dataset_complete, X_for_training_normalizer, df_pca_norm = obtener_datos_parallel()
+
+# Procesar otras columnas como se mencionaba en el código original
 input_datos['Operadores Escala Pequeña BAF'] = input_datos['operadores_escal_pequeña_baf']
 input_datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
 input_datos['Penetración BAF (Fibra)'] = input_datos['penetracion_baf_fibra']
 input_datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
-# Cargar el archivo GeoJSON desde MongoDB (si existe)
+# Consultando y cacheando el archivo GeoJSON desde MongoDB
 @st.cache_data
-def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
+def consultando_base_de_datos(_db):
+    """Consulta el archivo GeoJSON desde MongoDB GridFS y lo almacena en caché"""
     fs = GridFS(_db)
     file = fs.find_one({'filename': 'municipios.geojson'})
     if file:
         return file.read()
     return None
 
-# Convertir los datos GeoJSON a GeoDataFrame
+# Convertir los datos a GeoDataFrame
 def geojson_to_geodataframe(geojson_data):
     return gpd.read_file(BytesIO(geojson_data))
 
 # Conectar a MongoDB y obtener el archivo GeoJSON
 mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-db = connect_to_mongo()
+db = MongoClient(mongo_uri)['Municipios_Rodrigo']
 geojson_data = consultando_base_de_datos(db)
 
-# Convertir el archivo GeoJSON a GeoDataFrame si existe
+# Convertir a GeoDataFrame si los datos fueron encontrados
 geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
 
-# Verifica si el GeoDataFrame y datos existen para realizar la fusión
+# Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
 if geojson is not None:
-    # Asegurarnos de que 'cvegeo' esté bien en ambas bases de datos
     input_datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
     input_datos['CVEGEO'] = input_datos['CVEGEO'].astype(str).str.zfill(5)
     geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
@@ -180,23 +187,21 @@ else:
     st.write("No se pudo encontrar el archivo GeoJSON.")
 
 # Procesamiento de variables numéricas y categóricas
-
-# Definir variables numéricas y categóricas
 variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
 variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-
-# Definir variable de municipios (lugar) - variable de selección de municipios
 variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
 
-# Definir columnas a excluir en variables numéricas y categóricas
-columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 
-                              'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 
-                              'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
+columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
 columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
 
 # Filtrar las variables numéricas y categóricas, excluyendo las columnas mencionadas
 variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
 variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
+
+# Mostrar las listas resultantes
+st.write("Variables numéricas:", variable_list_numeric)
+st.write("Variables categóricas:", variable_list_categorical)
+st.write("Lista de municipios:", variable_list_municipio)
 
 # def convert_objectid_to_str(document):
 #     for key, value in document.items():
