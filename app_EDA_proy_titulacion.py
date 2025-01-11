@@ -286,7 +286,7 @@ with st.sidebar:
         <br><br> 
         Para obtener el grado de Maestro en Ciencia de Datos e Información.
         <hr> 
-        Asesor: <b> Ph.D. Mario Graff Guerrero </b>
+        Asesor: <a href='https://www.linkedin.com/in/guarneros' style='color: #51C622; text-decoration: none;'> Ph.D. Mario Graff Guerrero </a>
     </h5>
     """, unsafe_allow_html=True)
 
@@ -1837,7 +1837,7 @@ with tab2:
 
     # Columna derecha: mapa y gráficos en secuencia vertical
     with col_der:
-        st.plotly_chart(cuadro_resumen, width=480, use_container_width=True)
+        st.plotly_chart(cuadro_resumen, width=450, use_container_width=True)
         # Mapa ajustado al ancho de la columna
         folium_static(fig_municipio, width=500, height=180)  # Ajusta estos valores según necesites
         # Histograma después
