@@ -1837,9 +1837,9 @@ with tab2:
 
     # Columna derecha: mapa y gráficos en secuencia vertical
     with col_der:
-        st.plotly_chart(cuadro_resumen, width=450, use_container_width=True)
+        st.plotly_chart(cuadro_resumen, width=400, use_container_width=True)
         # Mapa ajustado al ancho de la columna
-        folium_static(fig_municipio, width=500, height=180)  # Ajusta estos valores según necesites
+        folium_static(fig_municipio, width=450, height=180)  # Ajusta estos valores según necesites
         # Histograma después
         with st.expander('Análisis', expanded=False):
             st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
