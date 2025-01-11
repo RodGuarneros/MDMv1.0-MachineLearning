@@ -273,6 +273,20 @@ if geojson is not None:
     # Fusionar los datos con la geometría
     dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
 
+# Procesamiento de variables numéricas y categóricas
+variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
+variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
+variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
+
+columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
+columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
+
+# Numéricas
+variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
+# Categóricas
+variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
+
+
 # Para la aplicación, puedes procesar las columnas que necesitas a partir de 'datos'
 # y luego mostrarlas o utilizarlas como desees.
 
