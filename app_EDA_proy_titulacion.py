@@ -209,6 +209,23 @@ def geojson_to_geodataframe(geojson_data):
     """Convierte datos GeoJSON a GeoDataFrame"""
     return gpd.read_file(BytesIO(geojson_data))
 
+import pandas as pd
+import geopandas as gpd
+from pymongo import MongoClient
+from gridfs import GridFS
+from io import BytesIO
+import streamlit as st
+from bson import ObjectId
+
+def convert_objectid_to_str(document):
+    """Convierte ObjectId a string en documentos de MongoDB"""
+    for key, value in document.items():
+        if isinstance(value, ObjectId):
+            document[key] = str(value)
+    return document
+
+# [... resto del código de funciones auxiliares sin cambios ...]
+
 def main():
     try:
         # Obtener credenciales
@@ -233,7 +250,7 @@ def main():
         variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
         variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
         
-        # Crear lista de municipios
+        # Crear lista de municipios (sin crear el selectbox)
         variable_list_municipio = list(input_datos['Lugar'].unique()) if 'Lugar' in input_datos.columns else []
         
         # Filtrar variables excluidas
@@ -260,7 +277,7 @@ def main():
         return (dataset_complete_geometry, dataset_complete, 
                 X_for_training_normalizer, df_pca_norm,
                 variable_list_numeric, variable_list_categorical,
-                variable_list_municipio)  # Añadimos la lista de municipios al retorno
+                variable_list_municipio)
     
     except Exception as e:
         st.error(f"Error en la conexión a la base de datos: {str(e)}")
@@ -270,16 +287,7 @@ if __name__ == "__main__":
     (dataset_complete_geometry, dataset_complete, 
      X_for_training_normalizer, df_pca_norm,
      variable_list_numeric, variable_list_categorical,
-     variable_list_municipio) = main()  # Recibimos la lista de municipios
-
-    # Ahora puedes usar variable_list_municipio en tu selectbox
-    if variable_list_municipio:
-        variable_seleccionada_municipio = st.selectbox(
-            'Selecciona el municipio de tu interés:',
-            sorted(variable_list_municipio, reverse=False)
-        )
-    else:
-        st.error("No se encontraron municipios en los datos")
+     variable_list_municipio) = main()
 # def convert_objectid_to_str(document):
 #     for key, value in document.items():
 #         if isinstance(value, ObjectId):
