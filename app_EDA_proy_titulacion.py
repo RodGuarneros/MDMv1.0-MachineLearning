@@ -95,6 +95,8 @@ st.markdown("""
 # Conectar con MongoDB
 
 # Cargar variables de entorno
+
+# Función para convertir ObjectId a str
 def convert_objectid_to_str(document):
     """Convierte todos los ObjectId en un documento a string"""
     for key, value in document.items():
@@ -143,8 +145,6 @@ input_datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
 input_datos['Penetración BAF (Fibra)'] = input_datos['penetracion_baf_fibra']
 input_datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
-datos = input_datos
-
 # Cargar el archivo GeoJSON desde MongoDB (si existe)
 @st.cache_data
 def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
@@ -175,9 +175,28 @@ if geojson is not None:
 
     # Fusionar los datos con la geometría
     dataset_complete_geometry = input_datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
+    st.write("Datos con geometría añadida:", dataset_complete_geometry)
 else:
     st.write("No se pudo encontrar el archivo GeoJSON.")
 
+# Procesamiento de variables numéricas y categóricas
+
+# Definir variables numéricas y categóricas
+variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
+variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
+
+# Definir variable de municipios (lugar) - variable de selección de municipios
+variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
+
+# Definir columnas a excluir en variables numéricas y categóricas
+columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 
+                              'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 
+                              'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
+columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
+
+# Filtrar las variables numéricas y categóricas, excluyendo las columnas mencionadas
+variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
+variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
 
 # def convert_objectid_to_str(document):
 #     for key, value in document.items():
