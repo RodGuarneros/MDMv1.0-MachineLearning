@@ -99,6 +99,17 @@ st.markdown("""
 # Cargar variables de entorno
 
 # Función para convertir ObjectId a str
+import pandas as pd
+from pymongo import MongoClient
+import streamlit as st
+from bson import ObjectId
+from gridfs import GridFS
+import geopandas as gpd
+from io import BytesIO
+import concurrent.futures
+import json
+
+# Función para convertir ObjectId a str
 def convert_objectid_to_str(document):
     """Convierte todos los ObjectId en un documento a string"""
     for key, value in document.items():
@@ -131,27 +142,6 @@ def bajando_procesando_datos(collection_name):
 
     return datos
 
-# Consultar las colecciones en paralelo usando ThreadPoolExecutor
-@st.cache_data
-def obtener_datos_parallel():
-    """Obtiene los datos de las colecciones de MongoDB en paralelo"""
-    collections = ['datos_finales', 'completo', 'X_for_training_normalizer', 'df_pca_norm']
-    with ThreadPoolExecutor() as executor:
-        datos_list = list(executor.map(bajando_procesando_datos, collections))
-    
-    # Asignar los resultados a variables
-    input_datos, dataset_complete, X_for_training_normalizer, df_pca_norm = datos_list
-    return input_datos, dataset_complete, X_for_training_normalizer, df_pca_norm
-
-# Llamar a la función de consulta paralela
-input_datos, dataset_complete, X_for_training_normalizer, df_pca_norm = obtener_datos_parallel()
-
-# Procesar otras columnas como se mencionaba en el código original
-input_datos['Operadores Escala Pequeña BAF'] = input_datos['operadores_escal_pequeña_baf']
-input_datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
-input_datos['Penetración BAF (Fibra)'] = input_datos['penetracion_baf_fibra']
-input_datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
-
 # Consultando y cacheando el archivo GeoJSON desde MongoDB
 @st.cache_data
 def consultando_base_de_datos(_db):
@@ -166,30 +156,47 @@ def consultando_base_de_datos(_db):
 def geojson_to_geodataframe(geojson_data):
     return gpd.read_file(BytesIO(geojson_data))
 
-# Conectar a MongoDB y obtener el archivo GeoJSON
-mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-db = MongoClient(mongo_uri)['Municipios_Rodrigo']
-geojson_data = consultando_base_de_datos(db)
+# Paralelizar la carga de los datos y el procesamiento de las geometrías
+def cargar_datos_y_geojson():
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    db = MongoClient(mongo_uri)['Municipios_Rodrigo']
+    
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # Consultar los datos y el geojson en paralelo
+        future_datos = executor.submit(bajando_procesando_datos, 'datos_finales')
+        future_geojson = executor.submit(consultando_base_de_datos, db)
+        
+        datos = future_datos.result()
+        geojson_data = future_geojson.result()
 
-# Convertir a GeoDataFrame si los datos fueron encontrados
-geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
+    geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
+    return datos, geojson
+
+# Cargar los datos y el geojson
+datos, geojson = cargar_datos_y_geojson()
+
+input_datos = datos
 
 # Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
 if geojson is not None:
-    input_datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
-    input_datos['CVEGEO'] = input_datos['CVEGEO'].astype(str).str.zfill(5)
+    datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
+    datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
     geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
 
     # Fusionar los datos con la geometría
-    dataset_complete_geometry = input_datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
-    st.write("Datos con geometría añadida:", dataset_complete_geometry)
+    dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
+
+    # Convertir la columna 'geometry' a formato WKT para evitar problemas con pyarrow
+    dataset_complete_geometry['geometry'] = dataset_complete_geometry['geometry'].apply(lambda x: x.wkt if x else None)
+
+    # Mostrar los datos con geometría añadida
 else:
     st.write("No se pudo encontrar el archivo GeoJSON.")
 
 # Procesamiento de variables numéricas y categóricas
-variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
-variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
+variable_list_numerica = list(datos.select_dtypes(include=['int64', 'float64']).columns)
+variable_list_categoricala = list(datos.select_dtypes(include=['object', 'category']).columns)
+variable_list_municipio = list(datos['Lugar'].unique())  # Municipio seleccionado
 
 columns_to_exclude_numeric = ['Unnamed: 0', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
 columns_to_exclude_categorical = ['Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
@@ -202,6 +209,8 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 st.write("Variables numéricas:", variable_list_numeric)
 st.write("Variables categóricas:", variable_list_categorical)
 st.write("Lista de municipios:", variable_list_municipio)
+
+
 
 # def convert_objectid_to_str(document):
 #     for key, value in document.items():
