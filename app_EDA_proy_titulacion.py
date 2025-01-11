@@ -233,6 +233,9 @@ def main():
         variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
         variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
         
+        # Crear lista de municipios
+        variable_list_municipio = list(input_datos['Lugar'].unique()) if 'Lugar' in input_datos.columns else []
+        
         # Filtrar variables excluidas
         variable_list_numeric = [col for col in variable_list_numerica if col not in COLUMNAS_NUMERICAS_EXCLUIDAS]
         variable_list_categorical = [col for col in variable_list_categoricala if col not in COLUMNAS_CATEGORICAS_EXCLUIDAS]
@@ -256,17 +259,27 @@ def main():
         
         return (dataset_complete_geometry, dataset_complete, 
                 X_for_training_normalizer, df_pca_norm,
-                variable_list_numeric, variable_list_categorical)
+                variable_list_numeric, variable_list_categorical,
+                variable_list_municipio)  # Añadimos la lista de municipios al retorno
     
     except Exception as e:
         st.error(f"Error en la conexión a la base de datos: {str(e)}")
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 if __name__ == "__main__":
     (dataset_complete_geometry, dataset_complete, 
      X_for_training_normalizer, df_pca_norm,
-     variable_list_numeric, variable_list_categorical) = main()
+     variable_list_numeric, variable_list_categorical,
+     variable_list_municipio) = main()  # Recibimos la lista de municipios
 
+    # Ahora puedes usar variable_list_municipio en tu selectbox
+    if variable_list_municipio:
+        variable_seleccionada_municipio = st.selectbox(
+            'Selecciona el municipio de tu interés:',
+            sorted(variable_list_municipio, reverse=False)
+        )
+    else:
+        st.error("No se encontraron municipios en los datos")
 # def convert_objectid_to_str(document):
 #     for key, value in document.items():
 #         if isinstance(value, ObjectId):
