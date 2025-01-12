@@ -93,29 +93,48 @@ st.markdown("""
 # Visitantes #
 ##############
 
-# Conexión a MongoDB (ajusta el URI si usas MongoDB Atlas o una base de datos remota)
-client = MongoClient("mongodb://localhost:27017/")  # Ajusta el URI según tu configuración
-db = client.Municipios_Rodrigo
-collection = db.visitantes
+def convert_objectid_to_str(document):
+    for key, value in document.items():
+        if isinstance(value, ObjectId):
+            document[key] = str(value)
+    return document
+
+# Conexión a MongoDB utilizando st.secrets
+try:
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    
+    # Conexión a MongoDB usando la URI desde los secretos
+    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+    db = client['Municipios_Rodrigo']
+    collection = db['visitantes']  # Aquí es donde guardamos la información de los visitantes
+    st.write("Conexión exitosa a MongoDB")
+except Exception as e:
+    st.error(f"Error de conexión a MongoDB: {e}")
+    st.stop()
 
 # Función para actualizar el contador de visitas y almacenar la información del visitante
 def actualizar_contador(nombre, correo):
-    # Intentar obtener el contador actual
-    visita = collection.find_one({"_id": "contador"})
-    
-    if visita is None:
-        # Si no existe, inicializamos el contador
-        collection.insert_one({"_id": "contador", "contador": 1})
-        contador = 1
-    else:
-        # Si existe, incrementamos el contador
-        contador = visita["contador"] + 1
-        collection.update_one({"_id": "contador"}, {"$set": {"contador": contador}})
-    
-    # Guardar información del visitante (nombre y correo electrónico)
-    collection.insert_one({"nombre": nombre, "correo": correo, "contador": contador})
-    
-    return contador
+    try:
+        # Intentar obtener el contador actual
+        visita = collection.find_one({"_id": "contador"})
+
+        if visita is None:
+            # Si no existe, inicializamos el contador
+            collection.insert_one({"_id": "contador", "contador": 1})
+            contador = 1
+        else:
+            # Si existe, incrementamos el contador
+            contador = visita["contador"] + 1
+            collection.update_one({"_id": "contador"}, {"$set": {"contador": contador}})
+        
+        # Guardar información del visitante (nombre y correo electrónico)
+        collection.insert_one({"nombre": nombre, "correo": correo, "contador": contador})
+        
+        return contador
+    except Exception as e:
+        st.error(f"Error al actualizar el contador: {e}")
+        return None
 
 # Título de la aplicación
 st.title("Bienvenid@")
@@ -131,7 +150,9 @@ if submit_button:
     if nombre and correo:
         # Llamar a la función para actualizar el contador y guardar los datos
         contador_visitas = actualizar_contador(nombre, correo)
-        st.write(f"¡Gracias por tu interés, {nombre}!")
+        if contador_visitas is not None:
+            st.write(f"¡Gracias por tu interés, {nombre}!")
+            st.write(f"Este sitio ha sido visitado {contador_visitas} veces.")
     else:
         st.error("Por favor, ingresa tanto tu nombre como tu correo electrónico para continuar.")
 else:
