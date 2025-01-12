@@ -20,6 +20,7 @@ from sklearn.linear_model import LinearRegression
 import folium
 from streamlit_folium import folium_static  # Importar folium_static para Streamlit
 from scipy.stats import gaussian_kde
+import pymongo
 from pymongo import MongoClient
 from gridfs import GridFS
 from io import BytesIO
