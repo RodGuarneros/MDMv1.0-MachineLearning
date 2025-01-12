@@ -101,7 +101,6 @@ st.markdown("""
 # Cargar variables de entorno
 
 # Función para convertir ObjectId a str
-
 import streamlit as st
 import pymongo
 from pymongo import MongoClient
@@ -171,14 +170,22 @@ def bajando_procesando_datos():
     df_training = data['X_for_training_normalizer']
     df_normalizado = data['df_pca_norm']
 
-    # Realizar el procesamiento de los datos después de la carga
+    # Procesamiento de las columnas
     datos_finales['Operadores Escala Pequeña BAF'] = datos_finales['operadores_escal_pequeña_baf']
     datos_finales.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
     datos_finales['Penetración BAF (Fibra)'] = datos_finales['penetracion_baf_fibra']
     datos_finales.drop(columns=['penetracion_baf_fibra'], inplace=True)
+
+    # Excluir columnas que no se necesitan
+    columns_to_exclude_numeric = ['Cluster2','Unnamed: 0', 'Unnamed: 0.2', 'Unnamed: 0.2', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
+    columns_to_exclude_categorical = ['_id','Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
     
-    # Aquí puedes agregar el procesamiento de las demás columnas como lo hiciste antes
-    # ...
+    # Filtrar columnas numéricas y categóricas que no estén en las listas de exclusión
+    variable_list_numerica = list(datos_finales.select_dtypes(include=['int64', 'float64']).columns)
+    variable_list_categoricala = list(datos_finales.select_dtypes(include=['object', 'category']).columns)
+    
+    variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
+    variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
 
     return datos_finales, dataset_complete, df_training, df_normalizado
 
