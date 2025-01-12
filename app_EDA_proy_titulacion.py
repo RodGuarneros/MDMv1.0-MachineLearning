@@ -141,8 +141,8 @@ def main():
             st.write(datos.head())  # Solo se muestra las primeras filas de los datos
 
 # Ejecutar la aplicación principal
-if __name__ == "__main__":
-    main()
+    if __name__ == "__main__":
+        main()
 
 
 ######################################
@@ -155,12 +155,6 @@ if __name__ == "__main__":
 # Cargar variables de entorno
 
 # Función para convertir ObjectId a str
-
-def convert_objectid_to_str(document):
-    for key, value in document.items():
-        if isinstance(value, ObjectId):
-            document[key] = str(value)
-    return document
 
 # Función para cargar y procesar los datos con cache
 @st.cache_data
