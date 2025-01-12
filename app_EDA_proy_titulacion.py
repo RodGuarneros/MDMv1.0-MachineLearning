@@ -366,6 +366,8 @@ with st.sidebar:
 
     st.image('fuentes/cc.png', caption= '\u00A9 Copy Rights Rodrigo Guarneros, 2024', use_column_width=True)
     st.markdown("Esta aplicación web se rige por los derechos de propiedad de [Creative Commons CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Si quieres hacer algunos ajustes o adaptar esta aplicación te puedo ayudar, [escríbeme](rodrigo.guarneros@gmail.com).", unsafe_allow_html=True)
+    st.markdown(f"Visitas al sitio: **{contador_visitas}**", unsafe_allow_html=True)
+
 
 ######################
 # Mapa por Municipio #
