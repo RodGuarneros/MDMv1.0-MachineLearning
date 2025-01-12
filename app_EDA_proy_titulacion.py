@@ -101,49 +101,29 @@ def convert_objectid_to_str(document):
     return document
 
 # Función para mostrar el formulario solo una vez
-def mostrar_formulario_registro():
-    if "registrado" not in st.session_state:
-        st.session_state.registrado = False
+def incrementar_contador_visitas():
+    try:
+        # Obtener la URI de MongoDB desde los secretos
+        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+        
+        # Conexión a MongoDB usando la URI desde los secretos
+        client = MongoClient(mongo_uri)
+        db = client['Municipios_Rodrigo']
+        collection = db['visita']
+        
+        # Intentar obtener el contador de visitas
+        visita = collection.find_one_and_update(
+            {"_id": "contador"},  # Usamos un único documento con id 'contador'
+            {"$inc": {"contador": 1}},  # Incrementamos el contador
+            upsert=True,  # Si no existe el documento, lo crea
+            return_document=pymongo.ReturnDocument.AFTER  # Retorna el documento después de la actualización
+        )
+        
+        return visita['contador']  # Devuelve el valor del contador de visitas
 
-    if not st.session_state.registrado:
-        with st.form(key="registro_form"):
-            nombre = st.text_input("¿Cuál es tu nombre?")
-            correo = st.text_input("¿Cuál es tu correo electrónico?")
-            registrado = st.form_submit_button("Registrar")
-
-            if registrado:
-                # Guardar los datos del usuario y marcar como registrado
-                st.session_state.registrado = True
-                st.session_state.nombre = nombre
-                st.session_state.correo = correo
-                st.success(f"¡Bienvenid@, {nombre}!")
-                return True
-    return False
-
-# Lógica principal de la aplicación
-def main():
-    if mostrar_formulario_registro():
-        # Se registró el visitante, ahora corre el código siguiente
-        st.write("El registro ha sido exitoso. Ahora cargamos los datos...")
-        datos = bajando_procesando_datos()  # Aquí se cargan los datos después del registro
-
-        # Mostrar un pequeño resumen de los datos
-        st.write("Datos cargados exitosamente.")
-        st.write(datos.head())  # Solo se muestra las primeras filas de los datos
-    else:
-        # Si ya está registrado, se omite el formulario y se carga directamente los datos
-        if "nombre" in st.session_state:
-            st.write(f"Hola de nuevo, {st.session_state.nombre}! Cargando datos...")
-            datos = bajando_procesando_datos()  # Aquí se cargan los datos después de iniciar sesión
-
-            # Mostrar un pequeño resumen de los datos
-            st.write("Datos cargados exitosamente.")
-            st.write(datos.head())  # Solo se muestra las primeras filas de los datos
-
-# Ejecutar la aplicación principal
-if __name__ == "__main__":
-    main()
-
+    except Exception as e:
+        st.error(f"Hubo un error al acceder a la base de datos: {e}")
+        raise
 
 ######################################
 # Integración y preparación de Datos #
