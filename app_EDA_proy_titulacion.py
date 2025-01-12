@@ -89,10 +89,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-##############
-# Visitantes #
-##############
-# Función para convertir los ObjectId a strings
+
+######################################
+# Integración y preparación de Datos #
+######################################
+
+# Cargar las variables de entorno
+# Conectar con MongoDB
+
+# Cargar variables de entorno
+
+# Función para convertir ObjectId a str
 
 def convert_objectid_to_str(document):
     for key, value in document.items():
@@ -127,17 +134,6 @@ def incrementar_contador_visitas():
 
 # Incrementar contador de visitas
 contador_visitas = incrementar_contador_visitas()
-
-######################################
-# Integración y preparación de Datos #
-######################################
-
-# Cargar las variables de entorno
-# Conectar con MongoDB
-
-# Cargar variables de entorno
-
-# Función para convertir ObjectId a str
 
 # Función para cargar y procesar los datos con cache
 @st.cache_data
@@ -369,7 +365,6 @@ with st.sidebar:
 
     st.image('fuentes/cc.png', caption= '\u00A9 Copy Rights Rodrigo Guarneros, 2024', use_column_width=True)
     st.markdown("Esta aplicación web se rige por los derechos de propiedad de [Creative Commons CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Si quieres hacer algunos ajustes o adaptar esta aplicación te puedo ayudar, [escríbeme](rodrigo.guarneros@gmail.com).", unsafe_allow_html=True)
-    st.markdown(f"Visitas al sitio: **{contador_visitas}**", unsafe_allow_html=True)
 
 ######################
 # Mapa por Municipio #
