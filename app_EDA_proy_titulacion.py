@@ -116,7 +116,7 @@ def incrementar_contador_visitas():
             {"_id": "contador"},  # Usamos un único documento con id 'contador'
             {"$inc": {"contador": 1}},  # Incrementamos el contador
             upsert=True,  # Si no existe el documento, lo crea
-            return_document=pymongo.ReturnDocument.AFTER  # Retorna el documento después de la actualización
+            return_document=1  # Equivalente a pymongo.ReturnDocument.AFTER
         )
         
         return visita['contador']  # Devuelve el valor del contador de visitas
