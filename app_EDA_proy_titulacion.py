@@ -92,72 +92,98 @@ st.markdown("""
 ##############
 # Visitantes #
 ##############
-
+# Función para convertir los ObjectId a strings
 def convert_objectid_to_str(document):
     for key, value in document.items():
         if isinstance(value, ObjectId):
             document[key] = str(value)
     return document
 
-# Conexión a MongoDB utilizando st.secrets
-try:
-    # Obtener la URI de MongoDB desde los secretos
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    
-    # Conexión a MongoDB usando la URI desde los secretos
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    db = client['Municipios_Rodrigo']
-    collection = db['visitantes']  # Aquí es donde guardamos la información de los visitantes
-    st.write("Conexión exitosa a MongoDB")
-except Exception as e:
-    st.error(f"Error de conexión a MongoDB: {e}")
-    st.stop()
-
-# Función para actualizar el contador de visitas y almacenar la información del visitante
-def actualizar_contador(nombre, correo):
+# Función para cargar y procesar los datos con caché
+@st.cache_data
+def bajando_procesando_datos():
     try:
-        # Intentar obtener el contador actual
-        visita = collection.find_one({"_id": "contador"})
+        # Obtener la URI de MongoDB desde los secretos
+        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+        
+        # Conexión a MongoDB usando la URI desde los secretos
+        client = MongoClient(mongo_uri)
+        db = client['Municipios_Rodrigo']
+        collection = db['datos_finales']
 
-        if visita is None:
-            # Si no existe, inicializamos el contador
-            collection.insert_one({"_id": "contador", "contador": 1})
-            contador = 1
+        # Obtener todos los documentos de la colección y convertir ObjectId a str
+        datos_raw = collection.find()
+        
+        # Procesar los datos y convertir el ObjectId a string
+        datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+        # Asegurarse de que los datos sean interpretados correctamente en Latin1
+        for column in datos.select_dtypes(include=['object']).columns:
+            datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
+
+        # Limpiar los nombres de las columnas eliminando espacios
+        datos.columns = datos.columns.str.strip()
+
+        # Verifica si la columna 'Madurez' existe antes de convertirla
+        if 'Madurez' in datos.columns:
+            datos['Madurez'] = datos['Madurez'].astype('category')
         else:
-            # Si existe, incrementamos el contador
-            contador = visita["contador"] + 1
-            collection.update_one({"_id": "contador"}, {"$set": {"contador": contador}})
-        
-        # Guardar información del visitante (nombre y correo electrónico)
-        collection.insert_one({"nombre": nombre, "correo": correo, "contador": contador})
-        
-        return contador
+            st.write("La columna 'Madurez' no existe en los datos.")
+
+        # Verifica si 'Etapa_Madurez' existe y créala si es necesario
+        if 'Etapa_Madurez' in datos.columns:
+            datos['Madurez'] = datos['Etapa_Madurez'].astype('category')
+
+        return datos
+
     except Exception as e:
-        st.error(f"Error al actualizar el contador: {e}")
-        return None
+        st.error(f"Hubo un error al consultar la base de datos: {e}")
+        raise
 
-# Título de la aplicación
-st.title("Bienvenid@")
+# Lógica para mostrar el formulario de registro
+def mostrar_formulario_registro():
+    with st.form(key="registro_form"):
+        nombre = st.text_input("¿Cuál es tu nombre?")
+        correo = st.text_input("¿Cuál es tu correo electrónico?")
+        registrado = st.form_submit_button("Registrar")
 
-# Crear un formulario para el nombre y correo electrónico
-with st.form(key="visitor_form"):
-    nombre = st.text_input("¿Cuál es tu nombre?")
-    correo = st.text_input("¿Cuál es tu correo electrónico?")
-    submit_button = st.form_submit_button(label="Enviar")
+        if registrado:
+            # Puedes hacer algo con la información del visitante aquí
+            st.session_state.registrado = True  # Cambiar estado de registro
+            st.session_state.nombre = nombre
+            st.session_state.correo = correo
+            st.success(f"¡Bienvenid@, {nombre}!")
+            return True
+        return False
 
-# Verificar si el visitante ha proporcionado la información
-if submit_button:
-    if nombre and correo:
-        # Llamar a la función para actualizar el contador y guardar los datos
-        contador_visitas = actualizar_contador(nombre, correo)
-        if contador_visitas is not None:
-            st.write(f"¡Gracias por tu interés, {nombre}!")
-            st.write(f"Este sitio ha sido visitado {contador_visitas} veces.")
+# Lógica principal de la aplicación
+def main():
+    if "registrado" not in st.session_state:
+        st.session_state.registrado = False
+
+    if not st.session_state.registrado:
+        # Mostrar el formulario de registro
+        if mostrar_formulario_registro():
+            # Se registró el visitante, ahora corre el código siguiente
+            st.write("El registro ha sido exitoso. Ahora cargamos los datos...")
+            datos = bajando_procesando_datos()  # Aquí se cargan los datos después del registro
+
+            # Mostrar un pequeño resumen de los datos
+            st.write("Datos cargados exitosamente.")
+            st.write(datos.head())  # Solo se muestra las primeras filas de los datos
+        else:
+            st.write("Por favor, regístrate para continuar.")
     else:
-        st.error("Por favor, ingresa tanto tu nombre como tu correo electrónico para continuar.")
-else:
-    # Mostrar solo el formulario hasta que se ingrese la información
-    st.warning("Por favor, ingresa tu nombre y correo electrónico para continuar.")
+        # Si ya está registrado, puedes saltar el formulario y cargar los datos directamente
+        st.write(f"Hola de nuevo, {st.session_state.nombre}! Cargando datos...")
+        datos = bajando_procesando_datos()  # Aquí se cargan los datos después de iniciar sesión
+
+        # Mostrar un pequeño resumen de los datos
+        st.write(datos.head())  # Solo se muestra las primeras filas de los datos
+
+# Ejecutar la aplicación principal
+if __name__ == "__main__":
+    main()
 
 
 ######################################
