@@ -89,6 +89,56 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+##############
+# Visitantes #
+##############
+
+# Conexión a MongoDB (ajusta el URI si usas MongoDB Atlas o una base de datos remota)
+client = MongoClient("mongodb://localhost:27017/")  # Ajusta el URI según tu configuración
+db = client.Municipios_Rodrigo
+collection = db.visitantes
+
+# Función para actualizar el contador de visitas y almacenar la información del visitante
+def actualizar_contador(nombre, correo):
+    # Intentar obtener el contador actual
+    visita = collection.find_one({"_id": "contador"})
+    
+    if visita is None:
+        # Si no existe, inicializamos el contador
+        collection.insert_one({"_id": "contador", "contador": 1})
+        contador = 1
+    else:
+        # Si existe, incrementamos el contador
+        contador = visita["contador"] + 1
+        collection.update_one({"_id": "contador"}, {"$set": {"contador": contador}})
+    
+    # Guardar información del visitante (nombre y correo electrónico)
+    collection.insert_one({"nombre": nombre, "correo": correo, "contador": contador})
+    
+    return contador
+
+# Título de la aplicación
+st.title("Bienvenid@")
+
+# Crear un formulario para el nombre y correo electrónico
+with st.form(key="visitor_form"):
+    nombre = st.text_input("¿Cuál es tu nombre?")
+    correo = st.text_input("¿Cuál es tu correo electrónico?")
+    submit_button = st.form_submit_button(label="Enviar")
+
+# Verificar si el visitante ha proporcionado la información
+if submit_button:
+    if nombre and correo:
+        # Llamar a la función para actualizar el contador y guardar los datos
+        contador_visitas = actualizar_contador(nombre, correo)
+        st.write(f"¡Gracias por tu interés, {nombre}!")
+    else:
+        st.error("Por favor, ingresa tanto tu nombre como tu correo electrónico para continuar.")
+else:
+    # Mostrar solo el formulario hasta que se ingrese la información
+    st.warning("Por favor, ingresa tu nombre y correo electrónico para continuar.")
+
+
 ######################################
 # Integración y preparación de Datos #
 ######################################
@@ -1839,7 +1889,7 @@ with tab2:
     with col_der:
         st.plotly_chart(cuadro_resumen, width=400, use_container_width=True)
         # Mapa ajustado al ancho de la columna
-        folium_static(fig_municipio, width=450, height=180)  # Ajusta estos valores según necesites
+        folium_static(fig_municipio, width=455, height=180)  # Ajusta estos valores según necesites
         # Histograma después
         with st.expander('Análisis', expanded=False):
             st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
