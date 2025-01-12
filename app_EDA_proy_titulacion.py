@@ -93,93 +93,52 @@ st.markdown("""
 # Visitantes #
 ##############
 # Función para convertir los ObjectId a strings
+
 def convert_objectid_to_str(document):
     for key, value in document.items():
         if isinstance(value, ObjectId):
             document[key] = str(value)
     return document
 
-# Función para cargar y procesar los datos con caché
-@st.cache_data
-def bajando_procesando_datos():
-    try:
-        # Obtener la URI de MongoDB desde los secretos
-        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-        
-        # Conexión a MongoDB usando la URI desde los secretos
-        client = MongoClient(mongo_uri)
-        db = client['Municipios_Rodrigo']
-        collection = db['datos_finales']
-
-        # Obtener todos los documentos de la colección y convertir ObjectId a str
-        datos_raw = collection.find()
-        
-        # Procesar los datos y convertir el ObjectId a string
-        datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-
-        # Asegurarse de que los datos sean interpretados correctamente en Latin1
-        for column in datos.select_dtypes(include=['object']).columns:
-            datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
-
-        # Limpiar los nombres de las columnas eliminando espacios
-        datos.columns = datos.columns.str.strip()
-
-        # Verifica si la columna 'Madurez' existe antes de convertirla
-        if 'Madurez' in datos.columns:
-            datos['Madurez'] = datos['Madurez'].astype('category')
-        else:
-            st.write("La columna 'Madurez' no existe en los datos.")
-
-        # Verifica si 'Etapa_Madurez' existe y créala si es necesario
-        if 'Etapa_Madurez' in datos.columns:
-            datos['Madurez'] = datos['Etapa_Madurez'].astype('category')
-
-        return datos
-
-    except Exception as e:
-        st.error(f"Hubo un error al consultar la base de datos: {e}")
-        raise
-
-# Lógica para mostrar el formulario de registro
+# Función para mostrar el formulario solo una vez
 def mostrar_formulario_registro():
-    with st.form(key="registro_form"):
-        nombre = st.text_input("¿Cuál es tu nombre?")
-        correo = st.text_input("¿Cuál es tu correo electrónico?")
-        registrado = st.form_submit_button("Registrar")
-
-        if registrado:
-            # Puedes hacer algo con la información del visitante aquí
-            st.session_state.registrado = True  # Cambiar estado de registro
-            st.session_state.nombre = nombre
-            st.session_state.correo = correo
-            st.success(f"¡Bienvenid@, {nombre}!")
-            return True
-        return False
-
-# Lógica principal de la aplicación
-def main():
     if "registrado" not in st.session_state:
         st.session_state.registrado = False
 
     if not st.session_state.registrado:
-        # Mostrar el formulario de registro
-        if mostrar_formulario_registro():
-            # Se registró el visitante, ahora corre el código siguiente
-            st.write("El registro ha sido exitoso. Ahora cargamos los datos...")
-            datos = bajando_procesando_datos()  # Aquí se cargan los datos después del registro
+        with st.form(key="registro_form"):
+            nombre = st.text_input("¿Cuál es tu nombre?")
+            correo = st.text_input("¿Cuál es tu correo electrónico?")
+            registrado = st.form_submit_button("Registrar")
+
+            if registrado:
+                # Guardar los datos del usuario y marcar como registrado
+                st.session_state.registrado = True
+                st.session_state.nombre = nombre
+                st.session_state.correo = correo
+                st.success(f"¡Bienvenid@, {nombre}!")
+                return True
+    return False
+
+# Lógica principal de la aplicación
+def main():
+    if mostrar_formulario_registro():
+        # Se registró el visitante, ahora corre el código siguiente
+        st.write("El registro ha sido exitoso. Ahora cargamos los datos...")
+        datos = bajando_procesando_datos()  # Aquí se cargan los datos después del registro
+
+        # Mostrar un pequeño resumen de los datos
+        st.write("Datos cargados exitosamente.")
+        st.write(datos.head())  # Solo se muestra las primeras filas de los datos
+    else:
+        # Si ya está registrado, se omite el formulario y se carga directamente los datos
+        if "nombre" in st.session_state:
+            st.write(f"Hola de nuevo, {st.session_state.nombre}! Cargando datos...")
+            datos = bajando_procesando_datos()  # Aquí se cargan los datos después de iniciar sesión
 
             # Mostrar un pequeño resumen de los datos
             st.write("Datos cargados exitosamente.")
             st.write(datos.head())  # Solo se muestra las primeras filas de los datos
-        else:
-            st.write("Por favor, regístrate para continuar.")
-    else:
-        # Si ya está registrado, puedes saltar el formulario y cargar los datos directamente
-        st.write(f"Hola de nuevo, {st.session_state.nombre}! Cargando datos...")
-        datos = bajando_procesando_datos()  # Aquí se cargan los datos después de iniciar sesión
-
-        # Mostrar un pequeño resumen de los datos
-        st.write(datos.head())  # Solo se muestra las primeras filas de los datos
 
 # Ejecutar la aplicación principal
 if __name__ == "__main__":
