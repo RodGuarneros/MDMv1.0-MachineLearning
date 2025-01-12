@@ -141,8 +141,8 @@ def main():
             st.write(datos.head())  # Solo se muestra las primeras filas de los datos
 
 # Ejecutar la aplicación principal
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
 
 
 ######################################
