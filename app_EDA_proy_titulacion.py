@@ -1860,43 +1860,70 @@ with tab2:
         st.markdown(f'- Posteriormente, la siguiente gráfica: <span style="color:#51C622"> Histograma por variable</span>, te permite conocer la distribución de alguna variable de interés y combinarlo con las variables categóricas disponibles.', unsafe_allow_html=True)
         st.markdown(f'- Finalmente, ubica en qué lugar se encuentra tu municipio en esa variable de interés, comparado con los demás municipios: <span style="color:#51C622"> Diagrama de caja</span>, que permite revisar a profundidad cuál es el rezago del municipio de interés en esa métrica específica.', unsafe_allow_html=True)
     
-    # Crear tres columnas con proporción 47:6:47
-    col_izq, col_buffer, col_der = st.columns([47, 6, 47])
-    
-    # Columna izquierda: ranking
-    with col_izq:
-        # Contenedor con altura fija para el ranking
-        with st.container():
+    # Contenedor principal con altura y padding fijos
+    with st.container():
+        # Crear tres columnas con proporción 45:10:45 para dar más espacio al buffer
+        col_izq, col_buffer, col_der = st.columns([45, 10, 45])
+        
+        # Columna izquierda con dimensiones fijas
+        with col_izq:
+            # Contenedor con altura mínima fija para el ranking
+            st.markdown("""
+                <div style='min-height: 400px; padding: 10px;'>
+            """, unsafe_allow_html=True)
             st.plotly_chart(fig_ranking, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    # Columna buffer: espacio vacío
-    with col_buffer:
-        st.empty()
+        # Columna buffer con espacio visual definido
+        with col_buffer:
+            st.markdown("""
+                <div style='border-left: 1px solid rgba(255,255,255,0.1); 
+                          height: 100%; 
+                          margin: 0 auto;
+                          width: 2px;'>
+                </div>
+            """, unsafe_allow_html=True)
 
-    # Columna derecha: mapa y gráficos en secuencia vertical
-    with col_der:
-        # Contenedor con altura fija para el cuadro resumen
-        with st.container():
+        # Columna derecha con dimensiones fijas
+        with col_der:
+            # Contenedor para cuadro resumen
+            st.markdown("""
+                <div style='min-height: 100px; padding: 10px;'>
+            """, unsafe_allow_html=True)
             st.plotly_chart(cuadro_resumen, use_container_width=True)
-        
-        # Contenedor con altura fija para el mapa
-        with st.container():
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Contenedor para el mapa
+            st.markdown("""
+                <div style='min-height: 200px; padding: 10px;'>
+            """, unsafe_allow_html=True)
             folium_static(fig_municipio, width=480, height=180)
-        
-        # Análisis en expander
-        with st.expander('Análisis', expanded=False):
-            st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
-            st.markdown(f'<b style="color:#51C622">- Un grupo grande con baja madurez digital (primera cresta)</b>. La cresta más alta alcanza aproximadamente 200 municipios, representa la mayor concentración de casos con 700 municipios. ', unsafe_allow_html=True)
-            st.markdown(f'<b style="color:#51C622">- Un grupo más pequeño pero significativo con alta madurez digital (segunda cresta)</b>. Este grupo se concentra en el rango de 0.6 a 0.7, la cresta alcanza 150 municipios y en el acumulado son 450 casos.', unsafe_allow_html=True)
-            st.markdown(f'<b style="color:#51C622">- Relativamente pocos casos en los niveles intermedios, lo que podría implicar una transición rápida una vez que incia el proceso de madurez digital.</b> Este valle entre los grupos sugiere a 500 municipios y representa una clara separación entre ambos grupos.', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Análisis en expander
+            with st.expander('Análisis', expanded=False):
+                st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
+                st.markdown(f'<b style="color:#51C622">- Un grupo grande con baja madurez digital (primera cresta)</b>. La cresta más alta alcanza aproximadamente 200 municipios, representa la mayor concentración de casos con 700 municipios. ', unsafe_allow_html=True)
+                st.markdown(f'<b style="color:#51C622">- Un grupo más pequeño pero significativo con alta madurez digital (segunda cresta)</b>. Este grupo se concentra en el rango de 0.6 a 0.7, la cresta alcanza 150 municipios y en el acumulado son 450 casos.', unsafe_allow_html=True)
+                st.markdown(f'<b style="color:#51C622">- Relativamente pocos casos en los niveles intermedios, lo que podría implicar una transición rápida una vez que incia el proceso de madurez digital.</b> Este valle entre los grupos sugiere a 500 municipios y representa una clara separación entre ambos grupos.', unsafe_allow_html=True)
 
-        # Contenedores con altura fija para los gráficos restantes
-        with st.container():
-            st.plotly_chart(fig_hist_index, use_container_width=True)
-        with st.container():
-            st.plotly_chart(fig_hist, use_container_width=True)
-        with st.container():
-            st.plotly_chart(fig_boxplot, use_container_width=True)
+            # Contenedores para los gráficos restantes con sus propios expanders
+            graphs_with_height = [
+                (fig_hist_index, 400),
+                (fig_hist, 400),
+                (fig_boxplot, 400)
+            ]
+
+            for fig, height in graphs_with_height:
+                st.markdown(f"""
+                    <div style='min-height: {height}px; padding: 10px;'>
+                """, unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+    # Agregar espacio al final para mejor separación
+    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+
 # 3D
 
 with tab3:
