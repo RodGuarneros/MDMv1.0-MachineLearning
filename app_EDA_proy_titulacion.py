@@ -1869,10 +1869,10 @@ with tab2:
         with col_izq:
             # Contenedor con altura mínima ajustada para el ranking
             st.markdown("""
-                <div style='min-height: 10px; padding: 1px 1px 1px 1px;'>
+                <div style='min-height: 1px; padding: 1px 1px 1px 1px;'>
             """, unsafe_allow_html=True)
             st.plotly_chart(fig_ranking, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            # st.markdown("</div>", unsafe_allow_html=True)
 
         # Columna buffer con espacio visual más pequeño
         with col_buffer:
@@ -1888,17 +1888,17 @@ with tab2:
         with col_der:
             # Contenedor para cuadro resumen
             st.markdown("""
-                <div style='min-height: 10px; padding: 1px 1px 1px 1px;'>
+                <div style='min-height: 1px; padding: 1px 1px 1px 1px;'>
             """, unsafe_allow_html=True)
             st.plotly_chart(cuadro_resumen, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            # st.markdown("</div>", unsafe_allow_html=True)
             
             # Contenedor para el mapa
             st.markdown("""
-                <div style='min-height: 10px; padding: 1px 1px 1px 1px;'>
+                <div style='min-height: 1px; padding: 1px 1px 1px 1px;'>
             """, unsafe_allow_html=True)
             folium_static(fig_municipio, width=480, height=180)
-            st.markdown("</div>", unsafe_allow_html=True)
+            # st.markdown("</div>", unsafe_allow_html=True)
             
             # Análisis en expander
             with st.expander('Análisis', expanded=False):
@@ -1919,7 +1919,7 @@ with tab2:
                     <div style='min-height: {height}px; padding: 1px 1px 1px 1px;'>
                 """, unsafe_allow_html=True)
                 st.plotly_chart(fig, use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+                # st.markdown("</div>", unsafe_allow_html=True)
 
     # Agregar espacio al final para mejor separación
     # st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
