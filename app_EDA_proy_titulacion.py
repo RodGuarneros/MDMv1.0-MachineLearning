@@ -1869,7 +1869,7 @@ with tab2:
         with col_izq:
             # Contenedor con altura mínima ajustada para el ranking
             st.markdown("""
-                <div style='min-height: 350px; padding: 5px 5px 5px 5px;'>
+                <div style='min-height: 350px; padding: 1px 1px 1px 1px;'>
             """, unsafe_allow_html=True)
             st.plotly_chart(fig_ranking, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1888,14 +1888,14 @@ with tab2:
         with col_der:
             # Contenedor para cuadro resumen
             st.markdown("""
-                <div style='min-height: 100px; padding: 5px 5px 5px 5px;'>
+                <div style='min-height: 100px; padding: 1px 1px 1px 1px;'>
             """, unsafe_allow_html=True)
             st.plotly_chart(cuadro_resumen, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
             # Contenedor para el mapa
             st.markdown("""
-                <div style='min-height: 180px; padding: 5px 5px 5px 5px;'>
+                <div style='min-height: 180px; padding: 1px 1px 1px 1px;'>
             """, unsafe_allow_html=True)
             folium_static(fig_municipio, width=480, height=180)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1916,7 +1916,7 @@ with tab2:
 
             for fig, height in graphs_with_height:
                 st.markdown(f"""
-                    <div style='min-height: {height}px; padding: 5px 5px 5px 5px;'>
+                    <div style='min-height: {height}px; padding: 1px 1px 1px 1px;'>
                 """, unsafe_allow_html=True)
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
