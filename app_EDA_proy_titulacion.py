@@ -1922,7 +1922,7 @@ with tab2:
                 st.markdown("</div>", unsafe_allow_html=True)
 
     # Agregar espacio al final para mejor separación
-    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+    # st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 
 # 3D
 
