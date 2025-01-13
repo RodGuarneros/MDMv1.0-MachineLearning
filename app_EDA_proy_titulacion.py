@@ -1301,7 +1301,7 @@ grafico2d2 = generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_sel
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
