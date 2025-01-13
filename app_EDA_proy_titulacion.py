@@ -1865,13 +1865,13 @@ with tab2:
     
     # Columna izquierda: solo el ranking
     with col_izq:
-        st.plotly_chart(fig_ranking, width=400, use_container_width=True)
+        st.plotly_chart(fig_ranking, width=300, use_container_width=True)
 
     # Columna derecha: mapa y gráficos en secuencia vertical
     with col_der:
         st.plotly_chart(cuadro_resumen, width=400, use_container_width=True)
         # Mapa ajustado al ancho de la columna
-        folium_static(fig_municipio, width=455, height=180)  # Ajusta estos valores según necesites
+        folium_static(fig_municipio, width=430, height=180)  # Ajusta estos valores según necesites
         # Histograma después
         with st.expander('Análisis', expanded=False):
             st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
@@ -2060,7 +2060,7 @@ with tab6:
         st.markdown(f'El mapa que se presenta en esta sección hace evidente que existe una <span style="color:#51C622">concentración de municipios con nivel de madurez óptima (color verde) al rededor de zonas metropolitanas y norte del país.</span>', unsafe_allow_html=True)
         st.markdown(f'Los municipios en desarrollo (color rojo) tienden a concentrarse más en <span style="color:#51C622">la región central y sur del país.</span>.', unsafe_allow_html=True)
         st.markdown(f'Se puede ver una concentración significativa de municipios en fase de definición (color violeta) en la <span style="color:#51C622">península de Yucatán, formando un clúster definitivo</span>.', unsafe_allow_html=True)
-        st.markdown(f'Los municipios en fase de definición (color violeta) se pueden ver en zonas periféricas a grandes centros urbanos <span style="color:#51C622">lo que sugiere un efecto de desbordamiento digital de los municipios más desarrollados a los menos desarrollados.</span> En general, esta fase sugiere que los municipios ya tienen una infraestructura digital básica y están en proceso de formalizar sus procesos digitales.', unsafe_allow_html=True)
+        st.markdown(f'Los municipios en fase de definición (color violeta) se pueden ver en zonas periféricas a grandes centros urbanos <span style="color:#51C622">lo que sugiere un efecto de desbordamiento digital de los municipios más desarrollados a los menos desarrollados.</span> En general, esta fase sugiere que los municipios ya tienen una infraestructura digital básica y están formalizando sus procesos digitales.', unsafe_allow_html=True)
         st.markdown(f'Existen clústers claros en el nivel de madurez inicial (color azul turquesa)', unsafe_allow_html=True)
         st.markdown(f'Es posible observar <span style="color:#51C622">islas de desarrollo avanzado, correspondientes a centros urbanos importantes, rodeadas de zonas menos desarrolladas.</span>', unsafe_allow_html=True)
         st.markdown(f'Las disparidades regionales son evidentes y podrían requerir de <span style="color:#51C622">estrategias específicas para el despliegue de ofertas comerciales específicas o para el desarrollo digital de los municipios.</span>', unsafe_allow_html=True)
