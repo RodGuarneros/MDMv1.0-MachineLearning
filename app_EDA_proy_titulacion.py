@@ -1032,7 +1032,7 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Primero, veamos qué valores únicos tenemos en la columna Madurez    
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1139,7 +1139,7 @@ grafico3d = generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, l
 
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1220,7 +1220,7 @@ grafico2d1 = generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_sele
 
 def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1301,7 +1301,7 @@ grafico2d2 = generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_sel
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
