@@ -316,7 +316,7 @@ with st.sidebar:
         <br><br> 
         Para obtener el grado de Maestro en Ciencia de Datos e Información.
         <hr> 
-        Asesor: <a href='https://www.linkedin.com/in/guarneros' style='color: #51C622; text-decoration: none;'> Ph.D. Mario Graff Guerrero </a>
+        Asesor: <a href='https://www.infotec.mx/es_mx/Infotec/mario-graff-guerrero' style='color: #51C622; text-decoration: none;'> Ph.D. Mario Graff Guerrero </a>
     </h5>
     """, unsafe_allow_html=True)
 
@@ -1804,7 +1804,7 @@ with tab1:
             <span style="color:#51C622">24</span>) 
             <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank">
                 <em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em>
-            </a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en el sistema solar.
+            </a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en cualquier sistema (pone como ejemplo, al sistema solar y el papel del modelo de Kepler como punto de referencia para medir las variaciones de cada planeta y el sol, haciéndonos conscientes de los verdaderos movimientos de cada cuerpo planetario).
         </div>
         ''', unsafe_allow_html=True)
         
@@ -2056,8 +2056,8 @@ with tab5:
 with tab6:
 
     with st.expander('Análisis', expanded=False):
-        st.markdown(f'La clasificación proporcionada por el aprendizaje automático no supervizado sugiere que <span style="color:#51C622"> la madurez digital no es aleatoria, sino que sigue patrones relacionados con factores financieros, socio-económicos y geográficos</span>. Cuando se realizaba el entrenamiento de los modelos y se evaluaban, se revisaron los pesos de cada variable en cada componente principal; donde llama la atención que son estadísticamente relevantes variables geográficas como la latitud, longitud y el número de vecionos cercanos en un radio de 5 km. Sugiriendo que la proximidad geográfica entre los municipios influye en su madurez digital debido a la infraestructura compartida y la mobilidad de sus factores productivos.', unsafe_allow_html=True)
-        st.markdown(f'Es evidente en el mapa que existe una <span style="color:#51C622">concentración de municipios con nivel de madurez óptima (color verde) al rededor de zonas metropolitanas y norte del país.</span>', unsafe_allow_html=True)
+        st.markdown(f'La clasificación proporcionada por el aprendizaje automático no supervizado sugiere que <span style="color:#51C622"> la madurez digital de los municipios no es aleatoria, sino que sigue patrones relacionados con factores financieros, socio-económicos y geográficos</span>. Cuando se realizaba el entrenamiento de los modelos y se evaluaban, se revisaron los pesos de cada variable en cada componente principal; donde llama la atención que son estadísticamente relevantes variables geográficas como la latitud, longitud y el número de vecionos cercanos en un radio de 5 km. Sugiriendo que la proximidad geográfica entre los municipios influye en su madurez digital debido a la infraestructura compartida y la mobilidad de sus factores productivos.', unsafe_allow_html=True)
+        st.markdown(f'El mapa que se presenta en esta sección hace evidente que existe una <span style="color:#51C622">concentración de municipios con nivel de madurez óptima (color verde) al rededor de zonas metropolitanas y norte del país.</span>', unsafe_allow_html=True)
         st.markdown(f'Los municipios en desarrollo (color rojo) tienden a concentrarse más en <span style="color:#51C622">la región central y sur del país.</span>.', unsafe_allow_html=True)
         st.markdown(f'Se puede ver una concentración significativa de municipios en fase de definición (color violeta) en la <span style="color:#51C622">península de Yucatán, formando un clúster definitivo</span>.', unsafe_allow_html=True)
         st.markdown(f'Los municipios en fase de definición (color violeta) se pueden ver en zonas periféricas a grandes centros urbanos <span style="color:#51C622">lo que sugiere un efecto de desbordamiento digital de los municipios más desarrollados a los menos desarrollados.</span> En general, esta fase sugiere que los municipios ya tienen una infraestructura digital básica y están en proceso de formalizar sus procesos digitales.', unsafe_allow_html=True)
