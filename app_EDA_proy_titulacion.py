@@ -1860,29 +1860,43 @@ with tab2:
         st.markdown(f'- Posteriormente, la siguiente gráfica: <span style="color:#51C622"> Histograma por variable</span>, te permite conocer la distribución de alguna variable de interés y combinarlo con las variables categóricas disponibles.', unsafe_allow_html=True)
         st.markdown(f'- Finalmente, ubica en qué lugar se encuentra tu municipio en esa variable de interés, comparado con los demás municipios: <span style="color:#51C622"> Diagrama de caja</span>, que permite revisar a profundidad cuál es el rezago del municipio de interés en esa métrica específica.', unsafe_allow_html=True)
     
-    # Crear dos columnas principales con proporción 4:6 para dar más espacio al mapa
-    col_izq, col_der = st.columns([6, 6])
+    # Crear tres columnas con proporción 47:6:47
+    col_izq, col_buffer, col_der = st.columns([47, 6, 47])
     
-    # Columna izquierda: solo el ranking
+    # Columna izquierda: ranking
     with col_izq:
-        st.plotly_chart(fig_ranking, width=250, use_container_width=True)
+        # Contenedor con altura fija para el ranking
+        with st.container():
+            st.plotly_chart(fig_ranking, use_container_width=True)
+
+    # Columna buffer: espacio vacío
+    with col_buffer:
+        st.empty()
 
     # Columna derecha: mapa y gráficos en secuencia vertical
     with col_der:
-        st.plotly_chart(cuadro_resumen, width=400, use_container_width=True)
-        # Mapa ajustado al ancho de la columna
-        folium_static(fig_municipio, width=480, height=180)  # Ajusta estos valores según necesites
-        # Histograma después
+        # Contenedor con altura fija para el cuadro resumen
+        with st.container():
+            st.plotly_chart(cuadro_resumen, use_container_width=True)
+        
+        # Contenedor con altura fija para el mapa
+        with st.container():
+            folium_static(fig_municipio, width=480, height=180)
+        
+        # Análisis en expander
         with st.expander('Análisis', expanded=False):
             st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
             st.markdown(f'<b style="color:#51C622">- Un grupo grande con baja madurez digital (primera cresta)</b>. La cresta más alta alcanza aproximadamente 200 municipios, representa la mayor concentración de casos con 700 municipios. ', unsafe_allow_html=True)
             st.markdown(f'<b style="color:#51C622">- Un grupo más pequeño pero significativo con alta madurez digital (segunda cresta)</b>. Este grupo se concentra en el rango de 0.6 a 0.7, la cresta alcanza 150 municipios y en el acumulado son 450 casos.', unsafe_allow_html=True)
             st.markdown(f'<b style="color:#51C622">- Relativamente pocos casos en los niveles intermedios, lo que podría implicar una transición rápida una vez que incia el proceso de madurez digital.</b> Este valle entre los grupos sugiere a 500 municipios y representa una clara separación entre ambos grupos.', unsafe_allow_html=True)
 
-        st.plotly_chart(fig_hist_index, use_container_width=True)
-        st.plotly_chart(fig_hist, use_container_width=True)
-        # Boxplot al final
-        st.plotly_chart(fig_boxplot, use_container_width=True)
+        # Contenedores con altura fija para los gráficos restantes
+        with st.container():
+            st.plotly_chart(fig_hist_index, use_container_width=True)
+        with st.container():
+            st.plotly_chart(fig_hist, use_container_width=True)
+        with st.container():
+            st.plotly_chart(fig_boxplot, use_container_width=True)
 # 3D
 
 with tab3:
