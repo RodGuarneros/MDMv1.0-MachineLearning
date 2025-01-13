@@ -1862,25 +1862,25 @@ with tab2:
     
     # Contenedor principal con altura y padding fijos
     with st.container():
-        # Crear tres columnas con proporción 45:10:45 para dar más espacio al buffer
-        col_izq, col_buffer, col_der = st.columns([45, 10, 45])
+        # Crear tres columnas con proporción ajustada para reducir espacio de buffer
+        col_izq, col_buffer, col_der = st.columns([45, 5, 45])
         
         # Columna izquierda con dimensiones fijas
         with col_izq:
-            # Contenedor con altura mínima fija para el ranking
+            # Contenedor con altura mínima ajustada para el ranking
             st.markdown("""
-                <div style='min-height: 400px; padding: 10px;'>
+                <div style='min-height: 350px; padding: 5px;'>
             """, unsafe_allow_html=True)
             st.plotly_chart(fig_ranking, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # Columna buffer con espacio visual definido
+        # Columna buffer con espacio visual más pequeño
         with col_buffer:
             st.markdown("""
                 <div style='border-left: 1px solid rgba(255,255,255,0.1); 
                           height: 100%; 
                           margin: 0 auto;
-                          width: 2px;'>
+                          width: 1px;'>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -1888,14 +1888,14 @@ with tab2:
         with col_der:
             # Contenedor para cuadro resumen
             st.markdown("""
-                <div style='min-height: 100px; padding: 10px;'>
+                <div style='min-height: 100px; padding: 5px;'>
             """, unsafe_allow_html=True)
             st.plotly_chart(cuadro_resumen, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
             # Contenedor para el mapa
             st.markdown("""
-                <div style='min-height: 200px; padding: 10px;'>
+                <div style='min-height: 180px; padding: 5px;'>
             """, unsafe_allow_html=True)
             folium_static(fig_municipio, width=480, height=180)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1909,20 +1909,20 @@ with tab2:
 
             # Contenedores para los gráficos restantes con sus propios expanders
             graphs_with_height = [
-                (fig_hist_index, 400),
-                (fig_hist, 400),
-                (fig_boxplot, 400)
+                (fig_hist_index, 350),
+                (fig_hist, 350),
+                (fig_boxplot, 350)
             ]
 
             for fig, height in graphs_with_height:
                 st.markdown(f"""
-                    <div style='min-height: {height}px; padding: 10px;'>
+                    <div style='min-height: {height}px; padding: 5px;'>
                 """, unsafe_allow_html=True)
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
     # Agregar espacio al final para mejor separación
-    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 
 # 3D
 
