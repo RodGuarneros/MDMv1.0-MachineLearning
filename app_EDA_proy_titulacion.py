@@ -338,12 +338,13 @@ with st.sidebar:
     with st.expander('Enfoque de esta aplicación', expanded=False):
         st.write('''
             - Se basa en un enfoque de <span style="color:#51C622">"Programación Orientada a Objetos"</span>.
-            - Los 2,456 municipios se puede modelar a partir de sus atributos y funciones que en escencia definen sus características y capacidades para aprovechar la revolución digital, respectivamente. 
-            - Este primer análisis exploratorio de la información disponible forma parte de un proyecto integral que busca: <span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
+            - Los 2,456 municipios se pueden modelar a partir de sus atributos y funciones para aprovechar la revolución digital. 
+            - El principal objetivo es:<span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
             - Este aplicativo incluye atributos a nivel municipal tales como:
                 1. Número de viviendas. 
                 2. Grado educativo (Analfabetismo, Porcentaje de personas con educación básica, etc.).
-                3. Edad promedio, entre otas.
+                3. Edad promedio, 
+                4. Penetración de Internet, entre otas.
             - Con base en estas características, se pueden generar diferentes combinaciones y visualizaciones de interés para conocer mejor aspectos como:
                 1. La distribución estadística de las variables. 
                 2. Relación entre las variables. 
