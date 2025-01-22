@@ -339,7 +339,7 @@ with st.sidebar:
         st.write('''
             - Se basa en un enfoque de <span style="color:#51C622">"Programación Orientada a Objetos"</span>.
             - Los 2,456 municipios se pueden modelar a partir de sus atributos y funciones para aprovechar la revolución digital. 
-            - El principal objetivo es:<span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
+            - El principal objetivo es: <span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
             - Este aplicativo incluye atributos a nivel municipal tales como:
                 1. Número de viviendas. 
                 2. Grado educativo (Analfabetismo, Porcentaje de personas con educación básica, etc.).
