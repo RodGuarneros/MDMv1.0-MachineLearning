@@ -139,36 +139,33 @@ contador_visitas = incrementar_contador_visitas()
 # Función para cargar y procesar los datos con cache
 @st.cache_data
 def bajando_procesando_datos():
-    # Obtener la URI de MongoDB desde los secretos
     mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    
-    # Conexión a MongoDB usando la URI desde los secretos
     client = MongoClient(mongo_uri)
     db = client['Municipios_Rodrigo']
     collection = db['datos_finales']
 
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
+    # Obtener datos y convertir a DataFrame
     datos_raw = collection.find()
     datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
 
-    # Asegurarse de que los datos sean interpretados correctamente en Latin1
+    # Asegurarse de que los datos estén en Latin1
     for column in datos.select_dtypes(include=['object']).columns:
         datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
 
-    # Limpiar los nombres de las columnas eliminando espacios
-    datos.columns = datos.columns.str.strip()
-
-    # Verifica si la columna 'Madurez' existe antes de convertirla
-    if 'Madurez' in datos.columns:
-        datos['Madurez'] = datos['Madurez'].astype('category')
-    else:
-        st.write("La columna 'Madurez' no existe en los datos.")
-
-    # Verifica si 'Etapa_Madurez' existe y créala si es necesario
-    if 'Etapa_Madurez' in datos.columns:
-        datos['Madurez'] = datos['Etapa_Madurez'].astype('category')
-
+    categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
+    # Limpiar y normalizar la variable Madurez
+    # datos['Madurez'] = datos['Madurez'].str.strip()
+    
+    # Convertir a categoría con orden específico
+    datos['Madurez'] = pd.Categorical(
+        datos['Madurez'],
+        categories=categorias_orden,
+        ordered=False
+    )
+    
     return datos
+
+
 
 # Llamar a la función para cargar y procesar los datos
 datos = bajando_procesando_datos()
@@ -379,7 +376,7 @@ def crear_mapa_choropleth2(dataset, estado=None, cluster=None, lugar=None, munic
     Parámetros:
     - dataset: El dataset con los datos geoespaciales.
     - estado: El estado por el cual filtrar (opcional).
-    - cluster: El número de clúster por el cual filtrar (opcional).
+    - clúster: El número de clúster por el cual filtrar (opcional).
     - lugar: El nombre del lugar (municipio) para filtrar (opcional).
     - municipio_inicial: El nombre del municipio inicial para centrar el mapa si no se pasa un lugar.
     """
@@ -1030,9 +1027,13 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 ## 3D plot PCA ##
 #################
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Primero, veamos qué valores únicos tenemos en la columna Madurez    
-    # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # Primero, asegurarse que los valores de Madurez estén limpios y sean consistentes
+    color_map = {
+        'Optimización': '#51C622',
+        'Definición': '#CC6CE7',
+        'En desarrollo': '#D20103',
+        'Inicial': '#5DE2E7'
+    }
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1040,28 +1041,21 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Madurez'].astype('category')
+    pca_df['Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
     pca_df['Lugar'] = dataset_complete['Lugar']
 
-    # Definir un mapa de colores estricto
-    color_map = {
-        'Optimización': '#51C622',
-        'Definición': '#CC6CE7',
-        'En desarrollo': '#D20103',
-        'Inicial': '#5DE2E7'
-    }
-
-    # Crear el gráfico de dispersión 3D
-    fig = px.scatter_3d(pca_df, 
-                       x='PCA1', y='PCA2', z='PCA3',
-                       color='Madurez',
-                       labels={'PCA1': 'Componente PC1', 
-                              'PCA2': 'Componente PC2', 
-                              'PCA3': 'Componente PC3'},
-                       hover_data=['Lugar'],
-                       category_orders={'Madurez': ['Optimización', 'Definición','En desarrollo', 'Inicial']},  # Orden explícito
-                       color_discrete_map=color_map)
-
+    # Crear el gráfico asegurando el orden y los colores
+    fig = px.scatter_3d(
+        pca_df, 
+        x='PCA1', y='PCA2', z='PCA3',
+        color='Madurez',
+        labels={'PCA1': 'Componente PC1', 
+                'PCA2': 'Componente PC2', 
+                'PCA3': 'Componente PC3'},
+        hover_data=['Lugar'],
+        category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
+        color_discrete_map=color_map
+    )
     # Manejar lugar seleccionado
     if lugar_seleccionado:
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
@@ -1128,9 +1122,8 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
     return fig
 
-# Ejemplo de cómo usar la función en Streamlit
 
-grafico3d = generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
+grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
 
 ###################
 ### Gráfico 2D 1###
@@ -1139,7 +1132,7 @@ grafico3d = generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, l
 
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1219,19 +1212,19 @@ grafico2d1 = generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_sele
 
 
 def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    # Limpiar posibles espacios o caracteres invisibles en 'Madurez'
+    df['Madurez'] = df['Madurez'].astype('category')
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
-    df_pca2 = df_pca2[:, 1:4]
+    df_pca2 = df_pca2[:, 1:4]  # Selección de las primeras tres componentes principales
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Madurez'].astype('category')
+    pca_df['Etapa_Madurez'] = df['Madurez']
     pca_df['Lugar'] = dataset_complete['Lugar']
 
-    # Definir un mapa de colores estricto
+    # Definir un mapa de colores más contrastante
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
@@ -1239,60 +1232,64 @@ def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado
         'Inicial': '#5DE2E7'
     }
 
-    # Crear el gráfico de dispersión 2D
-    fig = px.scatter(pca_df, 
-                     x='PCA1', y='PCA3',
-                     color='Madurez',
-                     labels={'PCA1': 'Componente PC1', 
-                            'PCA3': 'Componente PC3'},
-                     hover_data=['Lugar'],
-                     category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
-                     color_discrete_map=color_map)
+    # Crear el gráfico asegurando consistencia en los colores
+    fig = px.scatter(
+        pca_df,
+        x='PCA1',
+        y='PCA3',
+        labels={'PCA1': 'Componente PC1', 'PCA3': 'Componente PC3'},
+        hover_data=['Lugar'],  # Información adicional en el hover
+        color='Etapa_Madurez',  # <- Especificar la columna para asignar colores
+        # category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
+        color_discrete_map=color_map  # Asignar colores específicos a las categorías
+    )
 
     # Manejar lugar seleccionado
     if lugar_seleccionado:
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
         if not lugar_df.empty:
-            # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
             fig.add_trace(
-                px.scatter(lugar_df, 
-                           x='PCA1', y='PCA3', hover_data=['Lugar'],
-                           color_discrete_map={'Madurez': 'green'}).data[0]
+                go.Scatter(
+                    x=lugar_df['PCA1'],
+                    y=lugar_df['PCA3'],
+                    mode='markers',
+                    marker=dict(size=12, color='orange', symbol='diamond'),
+                    name=f"Lugar: {lugar_seleccionado}"
+                )
             )
-            fig.update_traces(marker=dict(size=10, color='green', opacity=1), 
-                             selector=dict(name=lugar_seleccionado))
 
-    # Actualizar estilo de los marcadores
+    # Ajustar el estilo del gráfico
     fig.update_traces(
         marker=dict(
             size=8,
             opacity=0.7,
             line=dict(
-                width=0.02,
+                width=0.5,
                 color='gray'
             )
         )
     )
 
-    # Actualizar layout
+    # Actualizar el layout del gráfico
     fig.update_layout(
         title="PC1 vs. PC3 (2D)",
-        title_x=0.3,  # Centrar el título
-        showlegend=True,  # Asegurar que la leyenda esté visible
+        title_x=0.5,  # Centrar el título
+        showlegend=True,
         legend=dict(
-            title=dict(text='Madurez'),  # Título de la leyenda
-            itemsizing='constant',  # Tamaño constante para los elementos de la leyenda
-            font=dict(color='white'),
+            title=dict(text='Etapa de Madurez'),
+            itemsizing='constant'
         ),
-        font=dict(color='white'),
         paper_bgcolor='rgb(0, 0, 0)',
         plot_bgcolor='rgb(0, 0, 0)',
+        font=dict(color='white')
     )
 
     return fig
 
 
-grafico2d2 = generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
+
+
+grafico2d2 = generar_grafico_2d2(datos, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
 
 ###################
 ### Gráfico 2D 3###
@@ -1301,7 +1298,7 @@ grafico2d2 = generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_sel
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    # df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1382,8 +1379,8 @@ grafico2d3 = generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_sel
 
 def boxplot_por_cluster(df, variable):
     """
-    Genera un único boxplot con todos los puntos, coloreados según el cluster.
-    El tooltip muestra el 'lugar', la media, mediana y desviación estándar del cluster correspondiente.
+    Genera un único boxplot con todos los puntos, coloreados según el clúster.
+    El tooltip muestra el 'lugar', la media, mediana y desviación estándar del clúster correspondiente.
     
     Parameters:
         df (pd.DataFrame): El DataFrame de entrada.
@@ -1437,7 +1434,7 @@ boxplots_clusters = boxplot_por_cluster(datos, variable_seleccionada_numerica)
 
 def plot_histogram(df, numeric_column):
     """
-    Crea un histograma de superposición para cada cluster, usando colores basados en el mapa de colores proporcionado,
+    Crea un histograma de superposición para cada clúster, usando colores basados en el mapa de colores proporcionado,
     y agrega recuadros con las estadísticas distribuidos de manera organizada.
     
     Parameters:
@@ -1808,11 +1805,11 @@ with tab1:
         </div>
         ''', unsafe_allow_html=True)
         
-        st.markdown(f'3. La <span style="color:#51C622">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#51C622">Diciembre 2024</span></span>: “does science need reference points?”), también sostiene que “…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.</div>', unsafe_allow_html=True)
+        st.markdown(f'3. La <span style="color:#C2185B">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#C2185B">Diciembre 2024</span></span>: <i>“does science need reference points?”</i>), también sostiene que <i>“…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”</i>. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.', unsafe_allow_html=True)
 
         st.markdown(f'En este contexto, esta aplicación consiste en el marco de referencia para saber con precisión dónde están los municipios en su ciclo de madurez digital y describir el fenómeno.', unsafe_allow_html=True)
 
-        st.markdown(f'Esta aplicación es resultado de un <span style="color:#51C622">modelo de aprendizaje automático no supervisado</span> seleccionado de entre <span style="color:#51C622">450 modelos</span> y más de <span style="color:#51C622">un millón de iteraciones</span> para cada evaluación, con el fin de obtener una clasificación eficiente y precisa sin ningún criterio ajeno a las <span style="color:#51C622">181 características</span> medibles para cada municipio en México. Constituye un marco de referencia objetivo y preciso para ubicar al mununicipio de tu interés y compararlo con el total de municipios con miras a mejorar su madurez digital o conocer sus aptitudes para el desarrollo de negocios digitales. Asimismo, proporciona insights relevantes encuanto a la transición de un estado de madurez a otro y de las diferencias entre cada clasificación de municipios.', unsafe_allow_html=True)
+        st.markdown(f'Este aplicativo es resultado de un <span style="color:#51C622">modelo de aprendizaje automático no supervisado</span> seleccionado de entre <span style="color:#51C622">450 modelos</span> y más de <span style="color:#51C622">un millón de iteraciones</span> para cada evaluación, con el fin de obtener una clasificación eficiente y precisa sin ningún criterio ajeno a las <span style="color:#51C622">181 características</span> medibles para cada municipio en México. Constituye un marco de referencia objetivo y preciso para ubicar al mununicipio de tu interés y compararlo con el total de municipios con miras a mejorar su madurez digital o conocer sus aptitudes para el desarrollo de negocios digitales. Asimismo, proporciona insights relevantes encuanto a la transición de un estado de madurez a otro y de las diferencias entre cada clasificación de municipios.', unsafe_allow_html=True)
 
         st.markdown(f'<div style="text-align: right;">Rodrigo Guarneros Gutiérrez<br><span style="color:#51C622">Ciudad de México, 20.12.2024</span></div>', unsafe_allow_html=True)
 
@@ -1842,7 +1839,7 @@ with tab1:
         st.image("fuentes/como_utilizar_1.png", caption="Página de Inicio.", use_column_width=True)
         st.markdown(f'- <b style="color:#51C622">Barra de navegación:</b> Navega y selecciona el municipio de tu interés, las variables continuas y categóricas que quieres visualizar durante el análisis.', unsafe_allow_html=True)
         st.image("fuentes/como_utilizar_2.png", caption="Se pueden seleccionar dos variables para análisis correlacional y una variable categórica.", use_column_width=True)
-        st.markdown(f'Conoce el énfoque de programación orientado a objetos y detalles de la aplicación.', unsafe_allow_html=True)
+        st.markdown(f'Conoce el enfoque de la programación orientada a objetos y detalles de la aplicación.', unsafe_allow_html=True)
         st.image("fuentes/como_utilizar_3.png", caption="Enfoque de la aplicación y fuentes de información.", use_column_width=True)        
 
 
@@ -1855,7 +1852,7 @@ with tab2:
     with st.expander('Descripción', expanded=False):
         st.markdown(f'Esta sección incluye cuatro visualizaciones relevantes para conocer mejor al municipio seleccionado y el lugar que tiene en la clasificación realizada por nuestra máquina de inferencia estadística. Se sugiere analizar en el siguiente orden:', unsafe_allow_html=True)
         st.markdown(f'- Conoce el índice de madurez digital del municipio seleccionado y comparalo con el del resto de los municipios de México con el Ranking presentado en la primera gráfica: <span style="color:#51C622"> Gráfica de barras con el Índice de Madurez por Municipio, que resalta en rojo el municipio y el lugar que ocupa en el Ranking.</span>', unsafe_allow_html=True)
-        st.markdown(f'- Del lado derecho podrás encontrar la localización geográfica y el tipo de estado de madurez digital que tiene el municipio de acuerdo a su color: <span style="color:#51C622"> La geografía y sus vecinos cercanos es importante, profundiza más en la sección "Geografía" de esta aplicación.</span>.', unsafe_allow_html=True)
+        st.markdown(f'- Del lado derecho podrás encontrar el lungar del Municipio en el Ranking, la localización geográfica y el tipo de estado de madurez digital que tiene el municipio de acuerdo a su color: <span style="color:#51C622"> La geografía y sus vecinos cercanos es importante, profundiza más en la sección "Geografía" de esta aplicación.</span>.', unsafe_allow_html=True)
         st.markdown(f'- Justo después del mapa, podrás encontrar los estádisticos básicos de la distribución estadística del <span style="color:#51C622"> Índice de Madurez Digital.</span> Visita el área de análisis de esta gráfica para conocer más.', unsafe_allow_html=True)
         st.markdown(f'- Posteriormente, la siguiente gráfica: <span style="color:#51C622"> Histograma por variable</span>, te permite conocer la distribución de alguna variable de interés y combinarlo con las variables categóricas disponibles.', unsafe_allow_html=True)
         st.markdown(f'- Finalmente, ubica en qué lugar se encuentra tu municipio en esa variable de interés, comparado con los demás municipios: <span style="color:#51C622"> Diagrama de caja</span>, que permite revisar a profundidad cuál es el rezago del municipio de interés en esa métrica específica.', unsafe_allow_html=True)
@@ -1945,7 +1942,7 @@ with tab3:
 
 
         with st.expander('Patrones en los clústers', expanded=False):
-            st.markdown(f'La separación entre clusters tiene mejor visibilidad en tres dimensiones, en general se puede decir que:', unsafe_allow_html=True)
+            st.markdown(f'La separación entre clústers tiene mejor visibilidad en tres dimensiones, en general se puede decir que:', unsafe_allow_html=True)
             st.markdown(
                 f'- <span style="color:#51C622">El clúster de los municipios en desarrollo (color rojo) es el más numeroso y disperso.</span>', unsafe_allow_html=True)
             st.markdown(
@@ -2056,7 +2053,7 @@ with tab5:
 with tab6:
 
     with st.expander('Análisis', expanded=False):
-        st.markdown(f'La clasificación proporcionada por el aprendizaje automático no supervizado sugiere que <span style="color:#51C622"> la madurez digital de los municipios no es aleatoria, sino que sigue patrones relacionados con factores financieros, socio-económicos y geográficos</span>. Cuando se realizaba el entrenamiento de los modelos y se evaluaban, se revisaron los pesos de cada variable en cada componente principal; donde llama la atención que son estadísticamente relevantes variables geográficas como la latitud, longitud y el número de vecionos cercanos en un radio de 5 km. Sugiriendo que la proximidad geográfica entre los municipios influye en su madurez digital debido a la infraestructura compartida y la mobilidad de sus factores productivos.', unsafe_allow_html=True)
+        st.markdown(f'La clasificación proporcionada por el aprendizaje automático no supervisado sugiere que <span style="color:#51C622"> la madurez digital de los municipios no es aleatoria, sino que sigue patrones relacionados con factores financieros, socio-económicos y geográficos</span>. Cuando se realizaba el entrenamiento de los modelos y se evaluaban, se revisaron los pesos de cada variable en cada componente principal; donde llama la atención que son estadísticamente relevantes variables geográficas como la latitud, longitud y el número de vecionos cercanos en un radio de 5 km. Sugiriendo que la proximidad geográfica entre los municipios influye en su madurez digital debido a la infraestructura compartida y la mobilidad de sus factores productivos.', unsafe_allow_html=True)
         st.markdown(f'El mapa que se presenta en esta sección hace evidente que existe una <span style="color:#51C622">concentración de municipios con nivel de madurez óptima (color verde) al rededor de zonas metropolitanas y norte del país.</span>', unsafe_allow_html=True)
         st.markdown(f'Los municipios en desarrollo (color rojo) tienden a concentrarse más en <span style="color:#51C622">la región central y sur del país.</span>.', unsafe_allow_html=True)
         st.markdown(f'Se puede ver una concentración significativa de municipios en fase de definición (color violeta) en la <span style="color:#51C622">península de Yucatán, formando un clúster definitivo</span>.', unsafe_allow_html=True)
