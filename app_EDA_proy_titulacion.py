@@ -193,82 +193,99 @@ def preparar_datos_para_visualizacion(datos, geojson):
 @st.cache_data
 def crear_mapa_choropleth2(dataset, lugar=None, municipio_inicial="Abalá, Yucatán"):
     """
-    Versión optimizada de la función de creación de mapa choropleth
+    Crea un mapa choropleth interactivo mostrando clústeres y filtrando por lugar.
+    Destaca el municipio seleccionado en color naranja y tamaño más grande.
     """
-    # Verificar si dataset ya es un GeoDataFrame
-    if not isinstance(dataset, gpd.GeoDataFrame) and 'geometry' in dataset.columns:
-        gdf = gpd.GeoDataFrame(dataset, geometry='geometry')
-    else:
-        gdf = dataset
+    # Convertir el dataset a GeoDataFrame si aún no lo es
+    gdf = gpd.GeoDataFrame(dataset, geometry='geometry')
     
-    # Filtrar por lugar de manera más eficiente
+    # Filtrar por 'Lugar' si se pasa como parámetro
     lugar_a_buscar = lugar if lugar else municipio_inicial
     if lugar_a_buscar:
-        gdf = gdf[gdf['Lugar'] == lugar_a_buscar]
-        if gdf.empty:
+        gdf_filtrado = gdf[gdf['Lugar'] == lugar_a_buscar]
+        if gdf_filtrado.empty:
+            print(f"No se encontraron datos para el lugar: {lugar_a_buscar}")
             return None
-    
-    # Procesamiento de geometría más eficiente
+        gdf = gdf_filtrado
+
+    # Obtener el centroide del municipio seleccionado
     centro = gdf.geometry.centroid.iloc[0]
     
-    # Crear el mapa
+    # Crear el mapa base centrado en el municipio
     m = folium.Map(
         location=[centro.y, centro.x],
-        zoom_start=12,
+        zoom_start=12,  # Aumentamos el zoom inicial
         tiles="CartoDB dark_matter"
     )
     
-    # Ajustar límites
+    # Ajustar los límites del mapa al municipio seleccionado
     bounds = gdf.geometry.total_bounds
     m.fit_bounds([
-        [bounds[1], bounds[0]],
-        [bounds[3], bounds[2]]
+        [bounds[1], bounds[0]],  # esquina suroeste
+        [bounds[3], bounds[2]]   # esquina noreste
     ])
-    
-    # Mapa de colores predefinido
+
+    # Mapa de colores personalizado para los clústeres
     mapa_colores = {
         'En desarrollo': '#D20103',
         'Inicial': '#5DE2E7',
         'Definición': '#CC6CE7',
         'Optimización': '#51C622',
     }
-    
-    # Simplificar función de obtención de color
-    obtener_color = lambda cluster_value: mapa_colores.get(cluster_value, '#FFFFFF')
-    
-    # Añadir GeoJson de manera más eficiente
+
+    # CAMBIO: Modificar la función para obtener color para usar naranja para el municipio seleccionado
+    def obtener_color(feature, lugar_seleccionado):
+        if feature['properties']['Lugar'] == lugar_seleccionado:
+            return '#FFA500'  # Color naranja para el municipio seleccionado
+        return mapa_colores.get(feature['properties']['Madurez'], '#FFFFFF')
+
+    # CAMBIO: Modificar el style_function para aplicar estilo especial al municipio seleccionado
+    def style_function(feature):
+        is_selected = feature['properties']['Lugar'] == lugar_a_buscar
+        return {
+            'fillColor': '#FFA500' if is_selected else mapa_colores.get(feature['properties']['Madurez'], '#FFFFFF'),
+            'color': 'white' if is_selected else 'black',  # Borde blanco para resaltar
+            'weight': 3 if is_selected else 1,  # Borde más grueso para el seleccionado
+            'fillOpacity': 0.9 if is_selected else 0.7,  # Más opaco el seleccionado
+        }
+
+    # Añadir la capa GeoJson con los colores personalizados y tooltips
     folium.GeoJson(
         gdf,
         name="Choropleth de Clústers",
-        style_function=lambda feature: {
-            'fillColor': obtener_color(feature['properties']['Madurez']),
-            'color': 'black',
-            'weight': 1,
-            'fillOpacity': 0.7,
-        },
+        style_function=style_function,
         tooltip=folium.GeoJsonTooltip(
             fields=['Lugar', 'Madurez'],
             aliases=['Lugar', 'Grado de Madurez'],
             localize=True,
-            sticky=True
+            sticky=True  # Hace que el tooltip sea permanente
         ),
-        highlight_function=lambda x: {'fillOpacity': 0.9}
+        highlight_function=lambda x: {'weight': 5, 'fillOpacity': 1.0}  # Resalta al pasar el mouse
     ).add_to(m)
-    
-    # Leyenda simplificada
-    legend_html = """
-    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white;
-                border: 2px solid grey; padding: 10px; border-radius: 5px;
-                font-size: 12px; z-index: 1000;">
+
+    # Añadir control de capas
+    folium.LayerControl().add_to(m)
+
+    # Añadir leyenda con estilo mejorado
+    legend = """
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; 
+                background-color: white;
+                border: 2px solid grey;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 12px;
+                z-index: 1000;">
         <b>Grado de Madurez</b><br>
         <i style="background: #D20103; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> En desarrollo<br>
         <i style="background: #5DE2E7; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> Inicial<br>
         <i style="background: #CC6CE7; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> Definición<br>
         <i style="background: #51C622; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> Optimización<br>
+        <i style="background: #FFA500; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> Municipio seleccionado<br>
     </div>
     """
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
+    m.get_root().html.add_child(folium.Element(legend))
+
     return m
 
 # 4. Optimizar la generación de gráficos con Plotly
@@ -595,87 +612,109 @@ def plot_histogram_with_density(df, numeric_column, selected_value=None, nbins=4
 @st.cache_data
 def generate_boxplot_with_annotations(df, variable, lugar_seleccionado):
     """
-    Versión optimizada del boxplot
+    Versión modificada del boxplot para destacar municipio seleccionado en naranja y tamaño más grande
     """
-    # Usar solo las columnas necesarias
-    columns_needed = ['Lugar', 'Municipio', variable]
-    df_subset = df[columns_needed].copy()
+    stats = {
+        'Media': np.mean(df[variable]),
+        'Mediana': np.median(df[variable]),
+        'Moda': df[variable].mode().iloc[0],
+        'Desviación estándar': np.std(df[variable])
+    }
     
-    # Calcular estadísticas una sola vez
-    stats = df_subset[variable].agg(['mean', 'median', 'std']).to_dict()
-    try:
-        stats['Moda'] = df_subset[variable].mode().iloc[0]
-    except:
-        stats['Moda'] = "N/A"
-    
-    # Crear el boxplot básico
     fig = px.box(
-        df_subset,
+        df,
         y=variable,
-        points=False,
+        points=False,  # No mostrar puntos en el boxplot
         title=f'Diagrama para la variable<br>"{variable}"',
         template='plotly_dark'
     )
 
-    # Añadir punto del lugar seleccionado de manera eficiente
     if lugar_seleccionado:
-        df_lugar = df_subset[df_subset['Lugar'] == lugar_seleccionado]
+        df_lugar = df[df['Lugar'] == lugar_seleccionado]
         if not df_lugar.empty:
+            # CAMBIO: Usar naranja y tamaño más grande
             fig.add_scatter(
                 x=[0] * len(df_lugar),
                 y=df_lugar[variable],
                 mode='markers',
                 marker=dict(
-                    color='rgba(0, 255, 0, 0.7)',
-                    size=10,
-                    line=dict(color='rgba(0, 255, 0, 1)', width=2)
+                    color='#FFA500',  # Cambio a naranja
+                    size=15,         # Tamaño más grande
+                    line=dict(color='white', width=1)  # Borde blanco para visibilidad
                 ),
                 name=f'Lugar seleccionado: {lugar_seleccionado}',
                 hovertemplate='<b>%{customdata[0]}</b><br>'+variable+': %{y:.2f}<extra></extra>',
                 customdata=df_lugar[['Municipio']]
             )
 
-    # Añadir todos los demás puntos de manera eficiente
-    df_rest = df_subset[df_subset['Lugar'] != lugar_seleccionado]
-    # Muestrear puntos si hay demasiados para mejorar rendimiento
-    if len(df_rest) > 500:
-        df_rest = df_rest.sample(500, random_state=42)
-        
+    df_rest = df[df['Lugar'] != lugar_seleccionado]
     fig.add_scatter(
         x=[0] * len(df_rest),
         y=df_rest[variable],
         mode='markers',
         marker=dict(
-            color='rgba(255, 165, 0, 0.5)',
+            color='rgba(255, 165, 0, 0.3)',  # Más transparente para contrastar con el seleccionado
             size=7,
-            line=dict(color='rgba(255, 165, 0, 0.7)', width=1)
+            line=dict(color='rgba(255, 165, 0, 0.7)', width=0.5)
         ),
         name='Otros lugares',
         hovertemplate='<b>%{customdata[0]}</b><br>'+variable+': %{y:.2f}<extra></extra>',
         customdata=df_rest[['Municipio']]
     )
 
-    # Texto de anotaciones
+    # Texto de las anotaciones agrupado
     annotations_text = "<br>".join([f"<b>{stat_name}</b>: {stat_value:.2f}" for stat_name, stat_value in stats.items()])
     
-    # Añadir anotaciones
+    # Añadir anotaciones agrupadas
     annotations = [
         dict(
-            x=0.5,
-            y=-0.3,
+            x=0.5,  # Centrar
+            y=-0.3,  # Ubicar debajo de la leyenda
             xref='paper',
             yref='paper',
             text=annotations_text,
             showarrow=False,
             font=dict(color='white', size=12),
             align='center',
-            bgcolor='rgba(0, 0, 0, 0.7)',
-            bordercolor='white',
-            borderwidth=2,
-            opacity=0.8
+            bgcolor='rgba(0, 0, 0, 0.7)',  # Fondo oscuro
+            bordercolor='white',  # Borde blanco
+            borderwidth=2,  # Ancho del borde
+            opacity=0.8  # Opacidad del recuadro
         )
     ]
 
+    fig.update_layout(
+        title_font=dict(color='#FFD86C', size=16),
+        title_x=0.2,  # Centrar título
+        showlegend=True,
+        width=1350,
+        height=500,  # Altura ajustada
+        margin=dict(l=55, r=55, t=80, b=200),  # Márgenes ajustados para leyenda y anotaciones
+        annotations=annotations,
+        legend=dict(
+            orientation='h',
+            yanchor='top',
+            y=-0.3,  # Posicionar leyenda debajo de la gráfica
+            xanchor='center',
+            x=0.5,   # Centrar leyenda
+            bgcolor='rgba(0,0,0,0)'
+        ),
+        yaxis=dict(
+            title=variable,
+            title_font=dict(color='#FFD86C'),
+            showgrid=True,
+            gridcolor='rgba(128, 128, 128, 0.2)'
+        ),
+        xaxis=dict(
+            showticklabels=False,
+            zeroline=False,
+            showgrid=False
+        ),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+
+    return fig
 
 
 
@@ -685,7 +724,7 @@ def generate_boxplot_with_annotations(df, variable, lugar_seleccionado):
 @st.cache_data
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None, max_points=2000):
     """
-    Versión optimizada del gráfico 3D con límite de puntos para mejor rendimiento
+    Versión optimizada del gráfico 3D que destaca el municipio seleccionado con color naranja y mayor tamaño
     """
     # Mapa de colores predefinido
     color_map = {
@@ -752,7 +791,7 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         color_discrete_map=color_map
     )
     
-    # Manejar lugar seleccionado de manera eficiente
+    # CAMBIO: Destacar municipio seleccionado con naranja y mayor tamaño
     if lugar_seleccionado:
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
         if not lugar_df.empty:
@@ -764,12 +803,16 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
                     z=lugar_df['PCA3'],
                     mode='markers',
                     marker=dict(
-                        size=10,
-                        color='green',
+                        size=15,  # Tamaño más grande
+                        color='#FFA500',  # Color naranja
                         opacity=1,
-                        symbol='circle'
+                        symbol='circle',
+                        line=dict(
+                            width=1,
+                            color='white'  # Borde blanco para destacar
+                        )
                     ),
-                    name=lugar_seleccionado,
+                    name=f"Lugar: {lugar_seleccionado}",
                     hovertemplate='<b>%{text}</b><extra></extra>',
                     text=[lugar_seleccionado]
                 )
@@ -785,7 +828,7 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         selector=dict(type='scatter3d')
     )
 
-    # Actualizar layout con configuración optimizada
+    # Actualizar layout
     fig.update_layout(
         title="Municipios por grado de madurez multidimensional",
         title_x=0.05,
@@ -823,11 +866,12 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
     return fig
 
+
 # 2. Optimizar la generación de gráficos 2D
 @st.cache_data
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None, max_points=2000, x_col='PCA1', y_col='PCA2', title=None):
     """
-    Versión optimizada y generalizada para gráficos 2D con cualquier par de componentes PCA
+    Versión optimizada y generalizada para gráficos 2D con municipio seleccionado en naranja y mayor tamaño
     """
     # Mapa de colores predefinido
     color_map = {
@@ -908,7 +952,7 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
         color_discrete_map=color_map
     )
     
-    # Resaltar lugar seleccionado
+    # CAMBIO: Resaltar lugar seleccionado con naranja y mayor tamaño
     if lugar_seleccionado:
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
         if not lugar_df.empty:
@@ -918,11 +962,17 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
                     y=lugar_df[y_col],
                     mode='markers',
                     marker=dict(
-                        size=12,
-                        color='orange',
-                        symbol='diamond'
+                        size=15,  # Tamaño más grande
+                        color='#FFA500',  # Color naranja
+                        symbol='circle',
+                        line=dict(
+                            width=1,
+                            color='white'  # Borde blanco para mayor visibilidad
+                        )
                     ),
-                    name=f"Lugar: {lugar_seleccionado}"
+                    name=f"Lugar: {lugar_seleccionado}",
+                    hovertemplate='<b>Lugar: %{text}</b><extra></extra>',
+                    text=[lugar_seleccionado]
                 )
             )
 
