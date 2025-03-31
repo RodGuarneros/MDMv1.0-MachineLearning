@@ -1,435 +1,242 @@
-#######################
-# Importar  librerias #
-#######################
-import streamlit as st
-import pandas as pd
-import altair as alt
-import plotly.express as px
-import io
-import geopandas as gpd
-import numpy as np
-import json
-import plotly.graph_objects as go
-import plotly.io as pio
-import altair_viewer as altviewer
-import logging
-import folium
-import zipfile
-from streamlit import components
-from sklearn.linear_model import LinearRegression
-import folium
-from streamlit_folium import folium_static  # Importar folium_static para Streamlit
-from scipy.stats import gaussian_kde
-import pymongo
-from pymongo import MongoClient
-from gridfs import GridFS
-from io import BytesIO
-from dotenv import load_dotenv
-import os
-from bson import ObjectId
-from concurrent.futures import ThreadPoolExecutor
+# Optimización 1: Mejorar la conexión y consultas a MongoDB
 
+# 1. Establecer conexión una sola vez (singleton)
+@st.cache_resource
+def get_mongodb_connection():
+    """
+    Establece una única conexión a MongoDB reutilizable
+    """
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    client = MongoClient(mongo_uri, maxPoolSize=10)  # Aumentar el tamaño del pool de conexiones
+    return client
 
-# Page configuration
-st.set_page_config(
-    page_title="Aprendizaje Automático para los Municipios de México",
-    page_icon="📱",
-    layout="wide",
-    initial_sidebar_state="expanded")
-
-alt.themes.enable("dark")
-
-#######################
-# CSS styling
-####################
-
-st.markdown("""
-<style>
-
-[data-testid="block-container"] {
-    padding-left: 2rem;
-    padding-right: 2rem;
-    padding-top: -10rem;
-    padding-bottom: 0rem;
-    margin-bottom: -7rem;
-}
-
-[data-testid="stVerticalBlock"] {
-    padding-left: 0rem;
-    padding-right: 0rem;
-}
-
-[data-testid="stMetric"] {
-    background-color: #393939;
-    text-align: center;
-    padding: 15px 0;
-}
-
-[data-testid="stMetricLabel"] {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-[data-testid="stMetricDeltaIcon-Up"] {
-    position: relative;
-    left: 38%;
-    -webkit-transform: translateX(-50%);
-    -ms-transform: translateX(-50%);
-    transform: translateX(-50%);
-}
-
-[data-testid="stMetricDeltaIcon-Down"] {
-    position: relative;
-    left: 38%;
-    -webkit-transform: translateX(-50%);
-    -ms-transform: translateX(-50%);
-    transform: translateX(-50%);
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
-######################################
-# Integración y preparación de Datos #
-######################################
-
-# Cargar las variables de entorno
-# Conectar con MongoDB
-
-# Cargar variables de entorno
-
-# Función para convertir ObjectId a str
-
-def convert_objectid_to_str(document):
-    for key, value in document.items():
-        if isinstance(value, ObjectId):
-            document[key] = str(value)
-    return document
-
-# Función para mostrar el formulario solo una vez
+# 2. Optimizar las funciones de consulta para hacer menos operaciones
+@st.cache_data(ttl=3600)  # Cache por 1 hora
 def incrementar_contador_visitas():
+    """
+    Incrementa el contador de visitas de manera más eficiente
+    """
     try:
-        # Obtener la URI de MongoDB desde los secretos
-        mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-        
-        # Conexión a MongoDB usando la URI desde los secretos
-        client = MongoClient(mongo_uri)
+        client = get_mongodb_connection()
         db = client['Municipios_Rodrigo']
         collection = db['visita']
         
-        # Intentar obtener el contador de visitas
-        visita = collection.find_one_and_update(
-            {"_id": "contador"},  # Usamos un único documento con id 'contador'
-            {"$inc": {"contador": 1}},  # Incrementamos el contador
-            upsert=True,  # Si no existe el documento, lo crea
-            return_document=pymongo.ReturnDocument.AFTER  # Usamos el valor correcto (AFTER)
+        # Usar updateOne con upsert en lugar de find_one_and_update para mejor rendimiento
+        result = collection.update_one(
+            {"_id": "contador"},
+            {"$inc": {"contador": 1}},
+            upsert=True
         )
         
-        return visita['contador']  # Devuelve el valor del contador de visitas
-
+        # Obtener el valor actualizado
+        doc = collection.find_one({"_id": "contador"})
+        return doc.get('contador', 0)
     except Exception as e:
-        st.error(f"Hubo un error al acceder a la base de datos: {e}")
-        raise
+        st.error(f"Error al acceder a la base de datos: {e}")
+        return 0  # Devolver 0 en caso de error para evitar interrupciones
 
-# Incrementar contador de visitas
-contador_visitas = incrementar_contador_visitas()
-
-# Función para cargar y procesar los datos con cache
-@st.cache_data
+# 3. Optimizar la carga de datos con proyecciones y filtros específicos
+@st.cache_data(ttl=3600*6)  # Cache por 6 horas
 def bajando_procesando_datos():
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    client = MongoClient(mongo_uri)
+    """
+    Optimiza la carga de datos principales usando proyecciones y filtrado del lado del servidor
+    """
+    client = get_mongodb_connection()
     db = client['Municipios_Rodrigo']
     collection = db['datos_finales']
 
-    # Obtener datos y convertir a DataFrame
-    datos_raw = collection.find()
-    datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+    # Especificar solo los campos necesarios (proyección)
+    projection = {
+        "_id": 1,
+        "Lugar": 1,
+        "Estado2": 1,
+        "Madurez": 1,
+        "Ranking": 1,
+        "Etapa_Madurez": 1,
+        "Índice_Compuesto": 1,
+        "cvegeo": 1,
+        "Latitud": 1,
+        "Longitud": 1,
+        # Incluir aquí todas las variables numéricas y categóricas relevantes
+        # que realmente se utilicen en las visualizaciones
+    }
 
-    # Asegurarse de que los datos estén en Latin1
-    for column in datos.select_dtypes(include=['object']).columns:
-        datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
-
-    categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
-    # Limpiar y normalizar la variable Madurez
-    # datos['Madurez'] = datos['Madurez'].str.strip()
+    # Obtener datos con proyección para reducir el tamaño de transferencia
+    datos_raw = list(collection.find({}, projection))
     
-    # Convertir a categoría con orden específico
-    datos['Madurez'] = pd.Categorical(
-        datos['Madurez'],
-        categories=categorias_orden,
-        ordered=False
-    )
+    # Convertir a DataFrame sin necesidad del map si la estructura es simple
+    datos = pd.DataFrame(datos_raw)
+    
+    # Limpieza de datos más eficiente
+    for column in datos.select_dtypes(include=['object']).columns:
+        if column in datos and datos[column].notna().any():
+            try:
+                datos[column] = datos[column].astype(str)
+            except:
+                pass  # Si falla la conversión, mantener el tipo original
+    
+    # Optimización de categorías
+    categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
+    if 'Madurez' in datos.columns:
+        datos['Madurez'] = pd.Categorical(
+            datos['Madurez'].astype(str).str.strip(),
+            categories=categorias_orden,
+            ordered=True  # Hacerlo ordenado mejora el rendimiento de ordenación
+        )
     
     return datos
 
-
-
-# Llamar a la función para cargar y procesar los datos
-datos = bajando_procesando_datos()
-input_datos = datos
-
-# Procesar otras columnas como se mencionaba en el código original
-datos['Operadores Escala Pequeña BAF'] = datos['operadores_escal_pequeña_baf']
-datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
-datos['Penetración BAF (Fibra)'] = datos['penetracion_baf_fibra']
-datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
-
-# OBTENIENDO EL DATASET COMPLETO:
-@st.cache_data
+# 4. Optimizar la carga del conjunto de datos completo
+@st.cache_data(ttl=3600*12)  # Cache por 12 horas
 def bajando_procesando_datos_completos():
-    # Obtener la URI de MongoDB desde los secretos
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    
-    # Conexión a MongoDB usando la URI desde los secretos
-    client = MongoClient(mongo_uri)
+    """
+    Optimiza la carga del dataset completo
+    """
+    client = get_mongodb_connection()
     db = client['Municipios_Rodrigo']
     collection = db['completo']
 
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
+    # Proyectar solo los campos necesarios
+    projection = {
+        # Incluir solo los campos que realmente se usan
+        "Lugar": 1,
+        # Añadir otros campos relevantes
+    }
 
-    dataset_complete = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-    for column in dataset_complete.select_dtypes(include=['object']).columns:
-        dataset_complete[column] = dataset_complete[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
-
-    # Limpiar los nombres de las columnas eliminando espacios
+    # Obtener los datos con una sola operación
+    datos_raw = list(collection.find({}, projection))
+    
+    dataset_complete = pd.DataFrame(datos_raw)
+    
+    # Limpieza más eficiente de columnas
     dataset_complete.columns = dataset_complete.columns.str.strip()
-
+    
     return dataset_complete
 
-dataset_complete = bajando_procesando_datos_completos()
+# 5. Uso de multithreading para cargas paralelas
+def cargar_todos_los_datos():
+    """
+    Carga todos los conjuntos de datos en paralelo
+    """
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # Lanzar las tareas en paralelo
+        future_datos = executor.submit(bajando_procesando_datos)
+        future_completo = executor.submit(bajando_procesando_datos_completos)
+        future_normalizador = executor.submit(bajando_procesando_X_entrenamiento)
+        
+        # Obtener resultados
+        datos = future_datos.result()
+        dataset_complete = future_completo.result()
+        df = future_normalizador.result()
+        
+    return datos, dataset_complete, df
 
-# OBTENIENDO X PARA EL TRAINING NORMALIZER:
-@st.cache_data
-def bajando_procesando_X_entrenamiento():
-    # Obtener la URI de MongoDB desde los secretos
+
+
+
+# Optimización 2: Mejorar el procesamiento y visualización de datos
+
+# 1. Optimizar la carga y procesamiento de archivos GeoJSON
+@st.cache_data(ttl=3600*24)  # Cache por 24 horas - los datos geográficos rara vez cambian
+def obtener_datos_geograficos():
+    """
+    Obtiene los datos geográficos de MongoDB de manera más eficiente
+    """
     mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    
-    # Conexión a MongoDB usando la URI desde los secretos
     client = MongoClient(mongo_uri)
     db = client['Municipios_Rodrigo']
-    collection = db['X_for_training_normalizer']
-
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
-    df = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-
-    # Limpiar los nombres de las columnas eliminando espacios
-    df.columns = df.columns.str.strip()
-
-    return df
-
-df = bajando_procesando_X_entrenamiento()
-
-# OBTENIENDO DF PCA NORMALIZER:
-@st.cache_data
-def bajando_procesando_df_normalizado():
-    # Obtener la URI de MongoDB desde los secretos
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    fs = GridFS(db)
     
-    # Conexión a MongoDB usando la URI desde los secretos
-    client = MongoClient(mongo_uri)
-    db = client['Municipios_Rodrigo']
-    collection = db['df_pca_norm']
-
-    # Obtener todos los documentos de la colección y convertir ObjectId a str
-    datos_raw = collection.find()
-    df_normalizado = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-
-    # Limpiar los nombres de las columnas eliminando espacios
-    df_normalizado.columns = df_normalizado.columns.astype(str).str.strip()
-
-    return df_normalizado
-
-df_normalizado = bajando_procesando_df_normalizado()
-
-# Procesamiento de variables numéricas y categóricas
-variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
-variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
-
-columns_to_exclude_numeric = ['Cluster2','Unnamed: 0', 'Unnamed: 0.2', 'Unnamed: 0.2', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
-columns_to_exclude_categorical = ['_id','Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
-
-# Numéricas
-variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
-# Categóricas
-variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
-
-# Conectar a MongoDB con caché para los polígonos
-@st.cache_resource
-def connect_to_mongo(mongo_uri):
-    client = MongoClient(mongo_uri)
-    return client['Municipios_Rodrigo']
-
-# Obtener el archivo GeoJSON desde MongoDB GridFS con caché
-@st.cache_data
-def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
-    fs = GridFS(_db)
     file = fs.find_one({'filename': 'municipios.geojson'})
-    if file:
-        return file.read()
-    return None
-
-# Convertir los datos a GeoDataFrame
-def geojson_to_geodataframe(geojson_data):
-    return gpd.read_file(BytesIO(geojson_data))
-
-# Conectar a MongoDB
-mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
-db = connect_to_mongo(mongo_uri)
-
-# Obtener el archivo GeoJSON
-geojson_data = consultando_base_de_datos(db)
-
-# Convertir a GeoDataFrame si los datos fueron encontrados
-geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
-
-# Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
-if geojson is not None:
-    datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
-    datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
-    geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
-
-    # Fusionar los datos con la geometría
-    dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
-
-
-###################################################################################################################
-###################################################################################################################
-###################################################################################################################
-
-# Sidebar
-with st.sidebar:
-    st.markdown("""
-    <h5 style='text-align: center;'> 
-        Centro de Investigación e Innovación en TICs (INFOTEC)
-        <hr>
-        Aplicación elaborada por <br><br>
-        <a href='https://www.linkedin.com/in/guarneros' style='color: #51C622; text-decoration: none;'>Rodrigo Guarneros Gutiérrez</a>        
-        <br><br> 
-        Para obtener el grado de Maestro en Ciencia de Datos e Información.
-        <hr> 
-        Asesor: <a href='https://www.infotec.mx/es_mx/Infotec/mario-graff-guerrero' style='color: #51C622; text-decoration: none;'> Ph.D. Mario Graff Guerrero </a>
-    </h5>
-    """, unsafe_allow_html=True)
-
-    st.sidebar.image("fuentes/nube.png", use_column_width=True)
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-    st.markdown("Principales características por Municipio:", unsafe_allow_html=True)
+    if not file:
+        return None
     
-    # variable_seleccionada_estado = st.selectbox('Selecciona el estado de tu interés:', sorted(variable_list_estado, reverse=False))
-    variable_seleccionada_municipio = st.selectbox('Selecciona el municipio de tu interés:', sorted(variable_list_municipio, reverse=False))
-
-    st.markdown("<hr>", unsafe_allow_html=True)
+    # Cargar directamente como GeoDataFrame
+    gdf = gpd.read_file(BytesIO(file.read()))
     
-    st.markdown("Análisis Estadístico por Variable:", unsafe_allow_html=True)
+    # Optimizar las columnas del GeoDataFrame
+    gdf['CVEGEO'] = gdf['CVEGEO'].astype(str)
+    
+    # Reducir el tamaño del GeoDataFrame manteniendo solo columnas necesarias
+    columns_to_keep = ['CVEGEO', 'geometry']
+    gdf = gdf[columns_to_keep]
+    
+    return gdf
 
-    variable_seleccionada_numerica = st.selectbox('Selecciona la variable numérica de interés:', sorted(variable_list_numeric, reverse=False))
-    variable_seleccionada_categorica = st.selectbox('Selecciona la variable categórica de interés:', sorted(variable_list_categorical, reverse=False))
-    variable_seleccionada_paracorrelacion = st.selectbox('Selecciona la variable que quieras correlaccionar con la primera selección:', sorted(variable_list_numeric, reverse=False))
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-    with st.expander('Enfoque de esta aplicación', expanded=False):
-        st.write('''
-            - Se basa en un enfoque de <span style="color:#51C622">"Programación Orientada a Objetos"</span>.
-            - Los 2,456 municipios se pueden modelar a partir de sus atributos y funciones para aprovechar la revolución digital. 
-            - El principal objetivo es: <span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
-            - Este aplicativo incluye atributos a nivel municipal tales como:
-                1. Número de viviendas. 
-                2. Grado educativo (Analfabetismo, Porcentaje de personas con educación básica, etc.).
-                3. Edad promedio, 
-                4. Penetración de Internet, entre otas.
-            - Con base en estas características, se pueden generar diferentes combinaciones y visualizaciones de interés para conocer mejor aspectos como:
-                1. La distribución estadística de las variables. 
-                2. Relación entre las variables. 
-                3. La distribución geográfica de las variables.
-            - La ventaja de un panel de control como este consiste en sus <span style="color:#51C622">economías de escala y la capacidad que tiene para presentar insights más profundos respecto a la población y sus funciones o actividades, tales como capacidad adquisitiva, preferencias, crédito al consumo, acceso a servicios de conectividad, empleo, sequías y hasta modelos predictivos.</span> 
-            ''', unsafe_allow_html=True)
-
-
-
-    with st.expander('Fuentes y detalles técnicos', expanded=False):
-        st.write('''
-            - Fuente: [Consejo Nacional de Población (CONAPO), consultado el 3 de febrero de 2024.](https://www.gob.mx/conapo).
-            - Tecnologías y lenguajes: Python 3.10, Streamlit 1.30.0, CSS 3.0, HTML5, Google Colab y GitHub. 
-            - Autor: Rodrigo Guarneros ([LinkedIn](https://www.linkedin.com/in/guarneros/) y [X](https://twitter.com/RodGuarneros)).
-            - Comentarios al correo electrónico rodrigo.guarneros@gmail.com
-            ''', unsafe_allow_html=True)
-
-    st.image('fuentes/cc.png', caption= '\u00A9 Copy Rights Rodrigo Guarneros, 2024', use_column_width=True)
-    st.markdown("Esta aplicación web se rige por los derechos de propiedad de [Creative Commons CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Si quieres hacer algunos ajustes o adaptar esta aplicación te puedo ayudar, [escríbeme](rodrigo.guarneros@gmail.com).", unsafe_allow_html=True)
-    st.markdown(f"Visitas al sitio: **{contador_visitas}**", unsafe_allow_html=True)
-
-
-######################
-# Mapa por Municipio #
-######################
-def crear_mapa_choropleth2(dataset, estado=None, cluster=None, lugar=None, municipio_inicial="MunicipioX"):
+# 2. Optimizar el procesamiento de datos para las visualizaciones
+@st.cache_data
+def preparar_datos_para_visualizacion(datos, geojson):
     """
-    Crea un mapa choropleth interactivo mostrando clústeres y filtrando por estado, clúster o lugar.
-    
-    Parámetros:
-    - dataset: El dataset con los datos geoespaciales.
-    - estado: El estado por el cual filtrar (opcional).
-    - clúster: El número de clúster por el cual filtrar (opcional).
-    - lugar: El nombre del lugar (municipio) para filtrar (opcional).
-    - municipio_inicial: El nombre del municipio inicial para centrar el mapa si no se pasa un lugar.
+    Prepara los datos para visualización de manera eficiente
     """
-    # Convertir el dataset a GeoDataFrame si aún no lo es
-    gdf = gpd.GeoDataFrame(dataset, geometry='geometry')
+    if 'cvegeo' in datos.columns:
+        # Crear copia solo de las columnas necesarias
+        datos_viz = datos[['Lugar', 'Madurez', 'cvegeo', 'Ranking', 'Etapa_Madurez', 'Índice_Compuesto']].copy()
+        
+        # Conversión eficiente de tipos
+        datos_viz['cvegeo'] = datos_viz['cvegeo'].astype(str).str.zfill(5)
+        datos_viz.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
+        
+        # Fusionar datos con geometría de manera eficiente
+        if geojson is not None:
+            # Usar merge con parámetros optimizados
+            dataset_geometry = datos_viz.merge(
+                geojson[['CVEGEO', 'geometry']], 
+                on='CVEGEO', 
+                how='left',
+                suffixes=('', '_geo')  # Evitar columnas duplicadas
+            )
+            return dataset_geometry
+    return datos
 
-    # Filtrar por 'Estado' si se pasa como parámetro
-    if estado:
-        gdf = gdf[gdf['Estado'] == estado]
+# 3. Optimizar funciones de visualización con caching adecuado
+@st.cache_data
+def crear_mapa_choropleth2(dataset, lugar=None, municipio_inicial="Abalá, Yucatán"):
+    """
+    Versión optimizada de la función de creación de mapa choropleth
+    """
+    # Verificar si dataset ya es un GeoDataFrame
+    if not isinstance(dataset, gpd.GeoDataFrame) and 'geometry' in dataset.columns:
+        gdf = gpd.GeoDataFrame(dataset, geometry='geometry')
+    else:
+        gdf = dataset
     
-    # Filtrar por 'Cluster' si se pasa como parámetro
-    if cluster is not None:
-        gdf = gdf[gdf['Clústers'] == cluster]
-    
-    # Filtrar por 'Lugar' si se pasa como parámetro
+    # Filtrar por lugar de manera más eficiente
     lugar_a_buscar = lugar if lugar else municipio_inicial
     if lugar_a_buscar:
-        gdf_filtrado = gdf[gdf['Lugar'] == lugar_a_buscar]
-        if gdf_filtrado.empty:
-            print(f"No se encontraron datos para el lugar: {lugar_a_buscar}")
+        gdf = gdf[gdf['Lugar'] == lugar_a_buscar]
+        if gdf.empty:
             return None
-        gdf = gdf_filtrado
-
-    # Obtener el centroide del municipio seleccionado
+    
+    # Procesamiento de geometría más eficiente
     centro = gdf.geometry.centroid.iloc[0]
-    # Crear el mapa base centrado en el municipio
+    
+    # Crear el mapa
     m = folium.Map(
         location=[centro.y, centro.x],
-        zoom_start=12,  # Aumentamos el zoom inicial
+        zoom_start=12,
         tiles="CartoDB dark_matter"
     )
     
-    # Ajustar los límites del mapa al municipio seleccionado
+    # Ajustar límites
     bounds = gdf.geometry.total_bounds
     m.fit_bounds([
-        [bounds[1], bounds[0]],  # esquina suroeste
-        [bounds[3], bounds[2]]   # esquina noreste
+        [bounds[1], bounds[0]],
+        [bounds[3], bounds[2]]
     ])
-
-    # Mapa de colores personalizado para los clústeres
+    
+    # Mapa de colores predefinido
     mapa_colores = {
         'En desarrollo': '#D20103',
         'Inicial': '#5DE2E7',
         'Definición': '#CC6CE7',
         'Optimización': '#51C622',
     }
-
-    # Función para obtener el color según el valor del 'Clústers'
-    def obtener_color(cluster_value):
-        return mapa_colores.get(cluster_value, '#FFFFFF')
-
-    # Añadir la capa GeoJson con los colores personalizados y tooltips
+    
+    # Simplificar función de obtención de color
+    obtener_color = lambda cluster_value: mapa_colores.get(cluster_value, '#FFFFFF')
+    
+    # Añadir GeoJson de manera más eficiente
     folium.GeoJson(
         gdf,
         name="Choropleth de Clústers",
@@ -443,24 +250,16 @@ def crear_mapa_choropleth2(dataset, estado=None, cluster=None, lugar=None, munic
             fields=['Lugar', 'Madurez'],
             aliases=['Lugar', 'Grado de Madurez'],
             localize=True,
-            sticky=True  # Hace que el tooltip sea permanente
+            sticky=True
         ),
-        highlight_function=lambda x: {'fillOpacity': 0.9}  # Resalta al pasar el mouse
+        highlight_function=lambda x: {'fillOpacity': 0.9}
     ).add_to(m)
-
-    # Añadir control de capas
-    folium.LayerControl().add_to(m)
-
-    # Añadir leyenda con estilo mejorado
-    legend = """
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; 
-                background-color: white;
-                border: 2px solid grey;
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 12px;
-                z-index: 1000;">
+    
+    # Leyenda simplificada
+    legend_html = """
+    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white;
+                border: 2px solid grey; padding: 10px; border-radius: 5px;
+                font-size: 12px; z-index: 1000;">
         <b>Grado de Madurez</b><br>
         <i style="background: #D20103; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> En desarrollo<br>
         <i style="background: #5DE2E7; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> Inicial<br>
@@ -468,59 +267,48 @@ def crear_mapa_choropleth2(dataset, estado=None, cluster=None, lugar=None, munic
         <i style="background: #51C622; width: 15px; height: 15px; display: inline-block; margin-right: 5px;"></i> Optimización<br>
     </div>
     """
-    m.get_root().html.add_child(folium.Element(legend))
-
+    m.get_root().html.add_child(folium.Element(legend_html))
+    
     return m
 
-# Llamar a la función con Streamlit y folium_static
-# Aquí asumo que 'dataset_complete_geometry' es tu dataset y 'variable_seleccionada_municipio' es el lugar seleccionado
-fig_municipio = crear_mapa_choropleth2(dataset_complete_geometry, lugar=variable_seleccionada_municipio, municipio_inicial="Abalá, Yucatán")
-
-##############
-## Ranking ###
-##############
+# 4. Optimizar la generación de gráficos con Plotly
+@st.cache_data
 def plot_bar_chart(data, lugar_columna, indice_columna, lugar_seleccionado):
     """
-    Genera una gráfica de barras horizontal con precisión completa en los valores del índice.
-    
-    Args:
-        data (pd.DataFrame): El DataFrame que contiene los datos.
-        lugar_columna (str): Nombre de la columna con los lugares.
-        indice_columna (str): Nombre de la columna con los índices a graficar.
-        lugar_seleccionado (str): Lugar que será resaltado en rojo.
+    Versión optimizada de la función de gráfico de barras
     """
-    # Crear una copia del DataFrame y asegurar tipo numérico
-    plot_data = data.copy()
+    # Reducir el tamaño de los datos
+    cols_needed = [lugar_columna, indice_columna, 'Ranking', 'Etapa_Madurez']
+    plot_data = data[cols_needed].copy()
+    
+    # Convertir a numérico de manera eficiente
     plot_data[indice_columna] = pd.to_numeric(plot_data[indice_columna], errors='coerce')
     
-    # Ordenar por índice compuesto de menor a mayor
+    # Ordenar eficientemente
     plot_data = plot_data.sort_values(by=indice_columna, ascending=True)
     
-    # Crear la lista de colores para las barras
+    # Crear colores de manera eficiente
     bar_colors = ['red' if lugar == lugar_seleccionado else 'dodgerblue' 
                  for lugar in plot_data[lugar_columna]]
     
-    # Crear la gráfica usando graph_objects
+    # Crear la figura de manera más eficiente
     fig = go.Figure()
     
-    # Añadir las barras con formato de hover personalizado y bordes blancos
+    # Añadir traza con formato optimizado
     fig.add_trace(go.Bar(
         x=plot_data[indice_columna],
         y=plot_data[lugar_columna],
         orientation='h',
         marker=dict(
             color=bar_colors,
-            line=dict(
-                color='white',  # Color del borde
-                width=0.5      # Ancho del borde
-            )
+            line=dict(color='white', width=0.5)
         ),
-        customdata=np.stack(( 
+        customdata=np.stack((
             plot_data["Ranking"],
             plot_data["Etapa_Madurez"],
             plot_data[indice_columna]
         ), axis=-1),
-        hovertemplate=( 
+        hovertemplate=(
             "Municipio: %{y}<br>" +
             "Índice de Madurez: %{customdata[2]:.10f}<br>" +
             "Lugar en el Ranking: %{customdata[0]}<br>" +
@@ -528,262 +316,149 @@ def plot_bar_chart(data, lugar_columna, indice_columna, lugar_seleccionado):
         )
     ))
     
-    # Crear anotaciones para personalizar los nombres y rankings
+    # Optimizar anotaciones
     annotations = []
-    for lugar, ranking, valor in zip(plot_data[lugar_columna], 
-                                   plot_data["Ranking"], 
-                                   plot_data[indice_columna]):
-        # Nombre del lugar
-        annotations.append(dict(
-            xref='paper', yref='y',
-            x=0, y=lugar,
-            text=lugar,
-            showarrow=False,
-            font=dict(
-                color='red' if lugar == lugar_seleccionado else 'white',
-                size=10,
-                family="Arial"
-            ),
-            xanchor='right',
-            xshift=-10
-        ))
-        # Ranking y valor preciso del índice
-        annotations.append(dict(
-            x=valor, y=lugar,
-            text=f"{int(ranking)} ({valor:.10f})",
-            showarrow=False,
-            font=dict(
-                color='white',
-                size=7
-            ),
-            xanchor='left',
-            xshift=5
-        ))
+    for i, (lugar, ranking, valor) in enumerate(zip(
+            plot_data[lugar_columna], 
+            plot_data["Ranking"], 
+            plot_data[indice_columna])):
+        if i % 5 == 0 or lugar == lugar_seleccionado:  # Reducir cantidad de anotaciones
+            annotations.append(dict(
+                xref='paper', yref='y',
+                x=0, y=lugar,
+                text=lugar,
+                showarrow=False,
+                font=dict(
+                    color='red' if lugar == lugar_seleccionado else 'white',
+                    size=10,
+                    family="Arial"
+                ),
+                xanchor='right',
+                xshift=-10
+            ))
+            annotations.append(dict(
+                x=valor, y=lugar,
+                text=f"{int(ranking)} ({valor:.6f})",  # Reducir decimales mostrados
+                showarrow=False,
+                font=dict(color='white', size=7),
+                xanchor='left',
+                xshift=5
+            ))
     
-    # Ajustar la altura dinámica
+    # Ajustar altura de manera más eficiente
     num_lugares = len(plot_data)
-    height = max(400, num_lugares * 18)
+    height = max(400, min(800, num_lugares * 15))  # Limitar la altura máxima
     
-    # Actualizar el layout
+    # Actualizar layout de manera más eficiente
     fig.update_layout(
         title=dict(
             text=f"Índice de Madurez por Municipio (Resaltado: {lugar_seleccionado})",
-            font=dict(color='#FFD86C')  # Color dorado para el título
+            font=dict(color='#FFD86C')
         ),
-        xaxis_title=dict(
-            text="Índice de Madurez",
-            font=dict(color='#FFD86C')  # Color dorado para el título del eje x
-        ),
-        yaxis_title=dict(
-            text="Municipio",
-            font=dict(color='#FFD86C')  # Color dorado para el título del eje y
-        ),
+        xaxis_title=dict(text="Índice de Madurez", font=dict(color='#FFD86C')),
+        yaxis_title=dict(text="Municipio", font=dict(color='#FFD86C')),
         height=height,
         margin=dict(l=200, r=20, t=70, b=50),
         showlegend=False,
         xaxis=dict(
             range=[0, plot_data[indice_columna].max() * 1.1],
-            tickformat='.10f',  # Mostrar más decimales en el eje x
-            showgrid=False     # Opcional: remover la cuadrícula
+            tickformat='.6f',  # Reducir precisión para mejorar rendimiento
+            showgrid=False
         ),
-        yaxis=dict(
-            showticklabels=False,
-            showgrid=False     # Opcional: remover la cuadrícula
-        ),
+        yaxis=dict(showticklabels=False, showgrid=False),
         annotations=annotations,
-        bargap=0.2,  # Espacio entre barras; valores altos las hacen más delgadas
-        plot_bgcolor='rgba(0, 0, 0, 0.1)',  # Fondo transparente
-        paper_bgcolor='rgba(0, 0, 0, 0)'    # Fondo transparente
+        bargap=0.2,
+        plot_bgcolor='rgba(0, 0, 0, 0.1)',
+        paper_bgcolor='rgba(0, 0, 0, 0)'
     )
     
     return fig
 
-fig_ranking = plot_bar_chart(data=datos,lugar_columna='Lugar', indice_columna='Índice_Compuesto', lugar_seleccionado=variable_seleccionada_municipio)
 
 
-########################
-#  Posición en ranking #
-########################
-def crear_display(data, lugar_seleccionado):
+# Optimización 3: Mejorar el rendimiento de gráficos estadísticos
+
+# 1. Optimizar el histograma para mejor rendimiento
+@st.cache_data
+def plot_histogram(df, numeric_column, categorical_column, nbins=30):
     """
-    Crea una figura simple que muestra el ranking del lugar seleccionado,
-    con color basado en su etapa de madurez.
-    
-    Args:
-        data (pd.DataFrame): El DataFrame que contiene los datos.
-        lugar_seleccionado (str): Lugar que será resaltado.
-    
-    Returns:
-        go.Figure: Figura que contiene el ranking con el color correspondiente.
+    Versión optimizada del histograma
     """
+    # Utilizar solo las columnas necesarias para reducir uso de memoria
+    df_subset = df[[numeric_column, categorical_column]].copy()
     
-    # Mapa de colores personalizado para los clústeres
-    mapa_colores = {
+    # Mapa de colores predefinido para mejorar rendimiento
+    color_map = {
         'En desarrollo': '#D20103',
         'Inicial': '#5DE2E7',
         'Definición': '#CC6CE7',
         'Optimización': '#51C622',
     }
-    
-    # Filtrar la fila del lugar seleccionado
-    lugar_row = data[data['Lugar'] == lugar_seleccionado]
-    if lugar_row.empty:
-        return None
-    
-    # Obtener el valor del ranking y la etapa de madurez
-    lugar_ranking = lugar_row['Ranking'].iloc[0]
-    etapa_madurez = lugar_row['Etapa_Madurez'].iloc[0]
-    
-    # Determinar el color según la etapa de madurez
-    color_rect = mapa_colores.get(etapa_madurez, 'dodgerblue')
-    
-    # Crear la figura
-    fig = go.Figure()
-    
-    # Añadir el rectángulo de fondo con esquinas redondeadas
-    fig.add_shape(
-        type="path",
-        path="M 0,0 Q 0,0 0.1,0 L 0.9,0 Q 1,0 1,0.1 L 1,0.9 Q 1,1 0.9,1 L 0.1,1 Q 0,1 0,0.9 Z",
-        fillcolor=color_rect,
-        line=dict(width=0),
-        xref="paper", yref="paper",  # Hace que el tamaño del rectángulo sea relativo
-        layer="below",  # Se asegura de que esté al fondo
-        opacity=1
-    )
-    
-    # Añadir el texto del ranking
-    fig.add_annotation(
-        text="Lugar en el Ranking de 2,456 municipios en México",
-        x=0.5,
-        y=0.80,
-        showarrow=False,
-        font=dict(
-            family="Arial",
-            size=12,
-            color="#050505"
-        ),
-        align="center"
-    )
-    
-    # Añadir el número del ranking
-    fig.add_annotation(
-        text=str(int(lugar_ranking)),
-        x=0.5,
-        y=0.35,
-        showarrow=False,
-        font=dict(
-            family="Arial",
-            size=37,
-            color="#050505"
-        ),
-        align="center"
-    )
-    
-    # Actualizar el layout para que sea más compacto
-    fig.update_layout(
-        width=200,
-        height=70,
-        margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor=color_rect,
-        plot_bgcolor=color_rect,
-        showlegend=False,
-        xaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            visible=False,
-            range=[0, 1]
-        ),
-        yaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            visible=False,
-            range=[0, 1]
-        )
-    )
-    
-    return fig
 
-cuadro_resumen = crear_display(datos, lugar_seleccionado=variable_seleccionada_municipio)
-
-##############
-# Histograma #
-##############
-def plot_histogram(df, numeric_column, categorical_column):
-    """
-    Elaborada por Rodrigo Guarneros
-    """
-    # Definir un mapa de colores personalizado para los clústeres
-    color_map = {
-        'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
-        'Inicial': '#5DE2E7',          # Cluster 1 -> Turquesa
-        'Definición': '#CC6CE7',       # Cluster 2 -> Amarillo
-        'Optimización': '#51C622',     # Cluster 3 -> Verde oscuro
-    }
-
-    # Crear el histograma
+    # Usar nbins para controlar la granularidad del histograma
     fig = px.histogram(
-        df, 
+        df_subset, 
         x=numeric_column, 
         color=categorical_column,
         color_discrete_map=color_map,
         opacity=0.6,
+        nbins=nbins,  # Controlar número de bins para mejor rendimiento
         title=f'Histograma de la variable "{numeric_column}" y <br>la categoría "{categorical_column}"'
     )
     
-    # Actualizar títulos de los ejes
+    # Actualizar ejes
     fig.update_yaxes(title_text="Frecuencia absoluta")
     
-    # Calcular estadísticos descriptivos
-    stats = {
-        'Media': df[numeric_column].mean(),
-        'Mediana': df[numeric_column].median(),
-        'Moda': df[numeric_column].mode()[0],
-        'Desviación estándar': df[numeric_column].std()
-    }
+    # Calcular estadísticas de manera más eficiente
+    # Usar .agg para calcular todas las estadísticas de una vez
+    stats = df_subset[numeric_column].agg(['mean', 'median', 'std']).to_dict()
+    try:
+        # La moda puede ser costosa, manejarla por separado
+        stats['Moda'] = df_subset[numeric_column].mode().iloc[0]
+    except:
+        stats['Moda'] = "N/A"
     
-    # Crear texto agrupado para las anotaciones
-    stats_text = "<br>".join([f"<b>{key}</b>: {value:.2f}" for key, value in stats.items()])
+    # Crear texto para las anotaciones de manera más eficiente
+    stats_text = "<br>".join([f"<b>{key.capitalize()}</b>: {value:.2f}" for key, value in stats.items()])
 
-    # Añadir conteo total por categoría
-    category_counts = df[categorical_column].value_counts()
+    # Simplificar el conteo por categoría
+    category_counts = df_subset[categorical_column].value_counts()
     counts_text = "<br>".join([f"<b>{category}</b>: {count}" for category, count in category_counts.items()])
     
-    # Recuadro de anotaciones
+    # Crear el texto de anotaciones de una sola vez
     annotations_text = f"{stats_text}<br><br><b>Conteo por categoría:</b><br>{counts_text}"
     
-    # Configurar la posición del recuadro de anotaciones
-    annotations = [
-        dict(
-            x=1.1,  # Centrar horizontalmente
-            y=0.9,  # Ubicar debajo de la leyenda
-            xref='paper',
-            yref='paper',
-            text=annotations_text,
-            showarrow=False,
-            font=dict(color='white', size=12),
-            align='center',
-            bgcolor='rgba(0, 0, 0, 0.7)',  # Fondo oscuro
-            bordercolor='white',  # Borde blanco
-            borderwidth=1,  # Ancho del borde
-            opacity=0.8  # Opacidad del recuadro
-        )
-    ]
+    # Configurar una sola anotación en lugar de múltiples
+    annotations = [dict(
+        x=1.1,
+        y=0.9,
+        xref='paper',
+        yref='paper',
+        text=annotations_text,
+        showarrow=False,
+        font=dict(color='white', size=12),
+        align='center',
+        bgcolor='rgba(0, 0, 0, 0.7)',
+        bordercolor='white',
+        borderwidth=1,
+        opacity=0.8
+    )]
     
-    # Actualizar diseño para incluir leyenda y recuadro
+    # Actualizar el diseño de manera más eficiente
     fig.update_layout(
         title_font=dict(color='#FFD86C', size=16),
-        title_x=0.05,  # Centrar título
+        title_x=0.05,
         showlegend=True,
         width=1350,
-        height=500,  # Altura ajustada para espacio de anotaciones
-        margin=dict(l=50, r=50, t=80, b=200),  # Márgenes ajustados
+        height=500,
+        margin=dict(l=50, r=50, t=80, b=200),
         annotations=annotations,
         legend=dict(
             orientation='h',
             yanchor='top',
-            y=-0.3,  # Posicionar leyenda debajo de la gráfica
+            y=-0.3,
             xanchor='center',
-            x=0.5,   # Centrar leyenda
+            x=0.5,
             bgcolor='rgba(0,0,0,0)'
         ),
         plot_bgcolor='rgba(0,0,0,0)',
@@ -800,88 +475,90 @@ def plot_histogram(df, numeric_column, categorical_column):
 
     return fig
 
-
-fig_hist = plot_histogram(input_datos, variable_seleccionada_numerica, variable_seleccionada_categorica)
-
-
-#####################
-## Histograma Dens ##
-#####################
-
-def plot_histogram_with_density(df, numeric_column, selected_value=None):
+# 2. Optimizar la creación del histograma con densidad
+@st.cache_data
+def plot_histogram_with_density(df, numeric_column, selected_value=None, nbins=40):
     """
-    Crea un histograma con línea de densidad, bordes en las barras, y destaca un punto específico.
-
-    Args:
-        df (pd.DataFrame): DataFrame que contiene los datos.
-        numeric_column (str): Nombre de la columna numérica para el histograma.
-        selected_value (float, optional): Valor seleccionado para resaltar en el gráfico.
-
-    Returns:
-        plotly.graph_objects.Figure: Objeto de figura del histograma.
+    Versión optimizada del histograma con densidad
     """
-    # Crear el histograma con bordes blancos
+    # Usar solo los datos necesarios
+    hist_data = df[numeric_column].dropna().astype(float)
+    
+    # Crear el histograma con configuración optimizada
     fig = px.histogram(
-        df,
-        x=numeric_column,
+        hist_data,
+        nbins=nbins,  # Controlar número de bins
         opacity=0.6,
         title=f'Distribución del índice de madurez digital',
-        nbins=50,  # Aumentar el número de bins
-        labels={'x': 'Valores del Índice', 'y': 'Frecuencia'}  # Añadido aquí
+        labels={'value': 'Valores del Índice', 'count': 'Frecuencia'}
     )
+    
+    # Aplicar estilo a las barras
     fig.update_traces(marker_line_color='white', marker_line_width=1.5)
 
-    # Calcular la densidad usando KDE
-    hist_data = df[numeric_column].dropna().astype(float)
-    kde = gaussian_kde(hist_data)
-    density_x = np.linspace(hist_data.min(), hist_data.max(), 1000)
-    density_y = kde(density_x)
-    density_y_scaled = density_y * len(hist_data) * (hist_data.max() - hist_data.min()) / 50
-
-    # Agregar la línea de densidad
-    fig.add_trace(
-        go.Scatter(
-            x=density_x,
-            y=density_y_scaled,
-            mode='lines',
-            line=dict(color='blue', width=2),
-            name='Dens'
-        )
-    )
-    
-    if selected_value is not None:
+    # Calcular la densidad de manera más eficiente
+    if len(hist_data) > 1:  # Verificar que hay suficientes datos
         try:
-            selected_value_float = float(selected_value)
+            kde = gaussian_kde(hist_data)
+            # Reducir el número de puntos para la línea de densidad
+            density_x = np.linspace(hist_data.min(), hist_data.max(), 200)
+            density_y = kde(density_x)
+            # Escalar la densidad para que coincida con el histograma
+            scale_factor = len(hist_data) * (hist_data.max() - hist_data.min()) / nbins
+            density_y_scaled = density_y * scale_factor
+
+            # Agregar la línea de densidad
             fig.add_trace(
                 go.Scatter(
-                    x=[selected_value_float],
-                    y=[0],
-                    mode='markers+text',
-                    marker=dict(color='red', size=10, line=dict(color='white', width=1)),
-                    text=f'{selected_value_float:.2f}',
-                    textposition='top center',
-                    name='Lugar seleccionado'
+                    x=density_x,
+                    y=density_y_scaled,
+                    mode='lines',
+                    line=dict(color='blue', width=2),
+                    name='Densidad'
                 )
             )
-        except ValueError:
-            print(f"Error: El valor seleccionado '{selected_value}' no es numérico y no se puede destacar.")
+        except:
+            # Si falla el KDE, continuar sin la línea de densidad
+            pass
     
-    # Calcular estadísticos descriptivos
-    mean = hist_data.mean()
-    std = hist_data.std()
-    median = hist_data.median()
-    mode = hist_data.mode()[0]
+    # Añadir punto seleccionado de manera eficiente
+    if selected_value is not None:
+        try:
+            # Convertir el valor seleccionado a numérico
+            selected_row = df[df['Lugar'] == selected_value]
+            if not selected_row.empty:
+                selected_value_float = selected_row[numeric_column].values[0]
+                fig.add_trace(
+                    go.Scatter(
+                        x=[selected_value_float],
+                        y=[0],
+                        mode='markers+text',
+                        marker=dict(color='red', size=10, line=dict(color='white', width=1)),
+                        text=f'{selected_value_float:.2f}',
+                        textposition='top center',
+                        name='Lugar seleccionado'
+                    )
+                )
+        except:
+            pass  # Si falla, continuar sin el punto resaltado
     
-    # Crear el texto de las anotaciones
+    # Calcular estadísticas de manera eficiente
+    stats = hist_data.agg(['mean', 'std', 'median']).to_dict()
+    try:
+        stats['mode'] = hist_data.mode().iloc[0]
+    except:
+        stats['mode'] = "N/A"
+    
+    # Texto de anotaciones
     annotation_text = (
         f"<b>Estadísticos:</b><br>"
-        f"Media: {mean:.2f}<br>"
-        f"Mediana: {median:.2f}<br>"
-        f"Moda: {mode:.2f}<br>"
-        f"Desv. Est.: {std:.2f}"
+        f"Media: {stats['mean']:.2f}<br>"
+        f"Mediana: {stats['median']:.2f}<br>"
+        f"Moda: {stats['mode']:.2f}<br>"
+        f"Desv. Est.: {stats['std']:.2f}"
     )
     
-    # Añadir las anotaciones
+    # Añadir anotaciones
     fig.add_annotation(
         dict(
             x=1, y=0.95, xref='paper', yref='paper',
@@ -895,7 +572,7 @@ def plot_histogram_with_density(df, numeric_column, selected_value=None):
         )
     )
 
-    # Estilo del gráfico
+    # Estilo del gráfico optimizado
     fig.update_layout(
         title_font=dict(color='#FFD86C'),
         xaxis_title_font=dict(color='#FFD86C'),
@@ -903,56 +580,67 @@ def plot_histogram_with_density(df, numeric_column, selected_value=None):
         legend=dict(title_text='Leyenda', font=dict(color='#FFD86C')),
         xaxis=dict(
             showgrid=False,
-            title='Valores del Índice'  # Actualizado aquí también
+            title='Valores del Índice'
         ),
         yaxis=dict(
             showgrid=False,
-            title='Frecuencia'  # Actualizado aquí también
+            title='Frecuencia'
         ),
         plot_bgcolor='rgba(0, 0, 0, 0.1)',
     )
 
     return fig
 
-
-fig_hist_index = plot_histogram_with_density(input_datos, numeric_column='Índice_Compuesto', selected_value=variable_seleccionada_municipio)
-
-######################
-##### BOX PLOT #######
-######################
+# 3. Optimizar el boxplot
+@st.cache_data
 def generate_boxplot_with_annotations(df, variable, lugar_seleccionado):
-    stats = {
-        'Media': np.mean(df[variable]),
-        'Mediana': np.median(df[variable]),
-        'Moda': df[variable].mode().iloc[0],
-        'Desviación estándar': np.std(df[variable])
-    }
+    """
+    Versión optimizada del boxplot
+    """
+    # Usar solo las columnas necesarias
+    columns_needed = ['Lugar', 'Municipio', variable]
+    df_subset = df[columns_needed].copy()
     
+    # Calcular estadísticas una sola vez
+    stats = df_subset[variable].agg(['mean', 'median', 'std']).to_dict()
+    try:
+        stats['Moda'] = df_subset[variable].mode().iloc[0]
+    except:
+        stats['Moda'] = "N/A"
+    
+    # Crear el boxplot básico
     fig = px.box(
-        df,
+        df_subset,
         y=variable,
-        points=False,  # No mostrar puntos en el boxplot
+        points=False,
         title=f'Diagrama para la variable<br>"{variable}"',
         template='plotly_dark'
     )
 
+    # Añadir punto del lugar seleccionado de manera eficiente
     if lugar_seleccionado:
-        df_lugar = df[df['Lugar'] == lugar_seleccionado]
-        fig.add_scatter(
-            x=[0] * len(df_lugar),
-            y=df_lugar[variable],
-            mode='markers',
-            marker=dict(
-                color='rgba(0, 255, 0, 0.7)',
-                size=10,
-                line=dict(color='rgba(0, 255, 0, 1)', width=2)
-            ),
-            name=f'Lugar seleccionado: {lugar_seleccionado}',
-            hovertemplate='<b>%{customdata[0]}</b><br>'+variable+': %{y:.2f}<extra></extra>',
-            customdata=df_lugar[['Municipio']]
-        )
+        df_lugar = df_subset[df_subset['Lugar'] == lugar_seleccionado]
+        if not df_lugar.empty:
+            fig.add_scatter(
+                x=[0] * len(df_lugar),
+                y=df_lugar[variable],
+                mode='markers',
+                marker=dict(
+                    color='rgba(0, 255, 0, 0.7)',
+                    size=10,
+                    line=dict(color='rgba(0, 255, 0, 1)', width=2)
+                ),
+                name=f'Lugar seleccionado: {lugar_seleccionado}',
+                hovertemplate='<b>%{customdata[0]}</b><br>'+variable+': %{y:.2f}<extra></extra>',
+                customdata=df_lugar[['Municipio']]
+            )
 
-    df_rest = df[df['Lugar'] != lugar_seleccionado]
+    # Añadir todos los demás puntos de manera eficiente
+    df_rest = df_subset[df_subset['Lugar'] != lugar_seleccionado]
+    # Muestrear puntos si hay demasiados para mejorar rendimiento
+    if len(df_rest) > 500:
+        df_rest = df_rest.sample(500, random_state=42)
+        
     fig.add_scatter(
         x=[0] * len(df_rest),
         y=df_rest[variable],
@@ -967,68 +655,39 @@ def generate_boxplot_with_annotations(df, variable, lugar_seleccionado):
         customdata=df_rest[['Municipio']]
     )
 
-    # Texto de las anotaciones agrupado
+    # Texto de anotaciones
     annotations_text = "<br>".join([f"<b>{stat_name}</b>: {stat_value:.2f}" for stat_name, stat_value in stats.items()])
     
-    # Añadir anotaciones agrupadas
+    # Añadir anotaciones
     annotations = [
         dict(
-            x=0.5,  # Centrar
-            y=-0.3,  # Ubicar debajo de la leyenda
+            x=0.5,
+            y=-0.3,
             xref='paper',
             yref='paper',
             text=annotations_text,
             showarrow=False,
             font=dict(color='white', size=12),
             align='center',
-            bgcolor='rgba(0, 0, 0, 0.7)',  # Fondo oscuro
-            bordercolor='white',  # Borde blanco
-            borderwidth=2,  # Ancho del borde
-            opacity=0.8  # Opacidad del recuadro
+            bgcolor='rgba(0, 0, 0, 0.7)',
+            bordercolor='white',
+            borderwidth=2,
+            opacity=0.8
         )
     ]
 
-    fig.update_layout(
-        title_font=dict(color='#FFD86C', size=16),
-        title_x=0.2,  # Centrar título
-        showlegend=True,
-        width=1350,
-        height=500,  # Altura ajustada
-        margin=dict(l=55, r=55, t=80, b=200),  # Márgenes ajustados para leyenda y anotaciones
-        annotations=annotations,
-        legend=dict(
-            orientation='h',
-            yanchor='top',
-            y=-0.3,  # Posicionar leyenda debajo de la gráfica
-            xanchor='center',
-            x=0.5,   # Centrar leyenda
-            bgcolor='rgba(0,0,0,0)'
-        ),
-        yaxis=dict(
-            title=variable,
-            title_font=dict(color='#FFD86C'),
-            showgrid=True,
-            gridcolor='rgba(128, 128, 128, 0.2)'
-        ),
-        xaxis=dict(
-            showticklabels=False,
-            zeroline=False,
-            showgrid=False
-        ),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
-    )
 
-    return fig
 
-    
-fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_seleccionada_numerica, variable_seleccionada_municipio)    
 
-#################
-## 3D plot PCA ##
-#################
-def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Primero, asegurarse que los valores de Madurez estén limpios y sean consistentes
+# Optimización 4: Mejorar gráficos 3D y 2D
+
+# 1. Optimizar la generación del gráfico 3D
+@st.cache_data
+def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None, max_points=2000):
+    """
+    Versión optimizada del gráfico 3D con límite de puntos para mejor rendimiento
+    """
+    # Mapa de colores predefinido
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
@@ -1036,16 +695,51 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         'Inicial': '#5DE2E7'
     }
     
-    # Normalización de PCA
-    df_pca2 = df_normalizado.to_numpy()
-    df_pca2 = df_pca2[:, 1:4]
+    # Extraer solo las columnas PCA necesarias de manera eficiente
+    if isinstance(df_normalizado, pd.DataFrame):
+        # Si ya es DataFrame, extraer columnas
+        if df_normalizado.shape[1] >= 4:
+            pca_cols = df_normalizado.iloc[:, 1:4].values
+        else:
+            # Fallback si no hay suficientes columnas
+            return None
+    else:
+        # Si es numpy array
+        df_pca2 = df_normalizado
+        if df_pca2.shape[1] >= 4:
+            pca_cols = df_pca2[:, 1:4]
+        else:
+            # Fallback si no hay suficientes columnas
+            return None
 
-    # Crear DataFrame para Plotly
-    pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
+    # Crear DataFrame para Plotly de manera eficiente
+    pca_df = pd.DataFrame(pca_cols, columns=['PCA1', 'PCA2', 'PCA3'])
+    pca_df['Madurez'] = df['Etapa_Madurez'] if 'Etapa_Madurez' in df.columns else df['Madurez']
     pca_df['Lugar'] = dataset_complete['Lugar']
+    
+    # Limitar número de puntos para mejor rendimiento
+    if len(pca_df) > max_points:
+        # Asegurar que el lugar seleccionado permanezca en el muestreo
+        lugar_df = None
+        if lugar_seleccionado:
+            lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
+        
+        # Muestrear el resto
+        resto_df = pca_df[pca_df['Lugar'] != lugar_seleccionado]
+        # Calcular cuántos puntos muestrear
+        muestra_size = max_points - (0 if lugar_df is None else len(lugar_df))
+        if muestra_size > 0 and len(resto_df) > muestra_size:
+            # Estratificar por Madurez para mantener proporciones
+            resto_muestra = resto_df.groupby('Madurez', group_keys=False).apply(
+                lambda x: x.sample(min(int(muestra_size * len(x) / len(resto_df)) + 1, len(x)), random_state=42)
+            )
+            # Combinar con el lugar seleccionado
+            if lugar_df is not None and not lugar_df.empty:
+                pca_df = pd.concat([lugar_df, resto_muestra])
+            else:
+                pca_df = resto_muestra
 
-    # Crear el gráfico asegurando el orden y los colores
+    # Crear el gráfico 3D optimizado
     fig = px.scatter_3d(
         pca_df, 
         x='PCA1', y='PCA2', z='PCA3',
@@ -1057,39 +751,48 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
         color_discrete_map=color_map
     )
-    # Manejar lugar seleccionado
+    
+    # Manejar lugar seleccionado de manera eficiente
     if lugar_seleccionado:
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
         if not lugar_df.empty:
-            # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
+            # Agregar solo los puntos específicos del lugar seleccionado
             fig.add_trace(
-                px.scatter_3d(lugar_df, 
-                             x='PCA1', y='PCA2', z='PCA3', hover_data=['Lugar'],
-                             color_discrete_map={'Madurez': 'green'}).data[0]
+                go.Scatter3d(
+                    x=lugar_df['PCA1'],
+                    y=lugar_df['PCA2'],
+                    z=lugar_df['PCA3'],
+                    mode='markers',
+                    marker=dict(
+                        size=10,
+                        color='green',
+                        opacity=1,
+                        symbol='circle'
+                    ),
+                    name=lugar_seleccionado,
+                    hovertemplate='<b>%{text}</b><extra></extra>',
+                    text=[lugar_seleccionado]
+                )
             )
-            fig.update_traces(marker=dict(size=20, color='green', opacity=1), 
-                            selector=dict(name=lugar_seleccionado))
 
     # Actualizar estilo de los marcadores
     fig.update_traces(
         marker=dict(
             size=6,
             opacity=0.7,
-            line=dict(
-                width=0.02,
-                color='gray'
-            )
-        )
+            line=dict(width=0.2, color='gray')
+        ),
+        selector=dict(type='scatter3d')
     )
 
-    # Actualizar layout
+    # Actualizar layout con configuración optimizada
     fig.update_layout(
         title="Municipios por grado de madurez multidimensional",
-        title_x=0.05,  # Centrar el título
-        showlegend=True,  # Asegurar que la leyenda esté visible
+        title_x=0.05,
+        showlegend=True,
         legend=dict(
-            title=dict(text='Madurez'),  # Título de la leyenda
-            itemsizing='constant',  # Tamaño constante para los elementos de la leyenda
+            title=dict(text='Madurez'),
+            itemsizing='constant',
             font=dict(color='white'),
         ),
         scene=dict(
@@ -1112,9 +815,6 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
                 zerolinecolor='white'
             ),
             bgcolor='rgb(0, 0, 0)',
-            xaxis_showgrid=True,
-            yaxis_showgrid=True,
-            zaxis_showgrid=True
         ),
         font=dict(color='white'),
         paper_bgcolor='rgb(0, 0, 0)',
@@ -1123,143 +823,110 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
     return fig
 
-
-grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
-
-###################
-### Gráfico 2D 1###
-###################
-
-
-def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
-    
-    # Normalización de PCA
-    df_pca2 = df_normalizado.to_numpy()
-    df_pca2 = df_pca2[:, 1:4]
-
-    # Crear DataFrame para Plotly
-    pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Madurez'].astype('category')
-    pca_df['Lugar'] = dataset_complete['Lugar']
-
-    # Definir un mapa de colores estricto
+# 2. Optimizar la generación de gráficos 2D
+@st.cache_data
+def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None, max_points=2000, x_col='PCA1', y_col='PCA2', title=None):
+    """
+    Versión optimizada y generalizada para gráficos 2D con cualquier par de componentes PCA
+    """
+    # Mapa de colores predefinido
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
         'En desarrollo': '#D20103',
         'Inicial': '#5DE2E7'
     }
-
-    # Crear el gráfico de dispersión 2D
-    fig = px.scatter(pca_df, 
-                     x='PCA1', y='PCA2',
-                     color='Madurez',
-                     labels={'PCA1': 'Componente PC1', 
-                            'PCA2': 'Componente PC2'},
-                     hover_data=['Lugar'],
-                     category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
-                     color_discrete_map=color_map)
-
-    # Manejar lugar seleccionado
-    if lugar_seleccionado:
-        lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
-        if not lugar_df.empty:
-            # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
-            fig.add_trace(
-                px.scatter(lugar_df, 
-                           x='PCA1', y='PCA2', hover_data=['Lugar'],
-                           color_discrete_map={'Madurez': 'green'}).data[0]
-            )
-            fig.update_traces(marker=dict(size=10, color='green', opacity=1), 
-                             selector=dict(name=lugar_seleccionado))
-
-    # Actualizar estilo de los marcadores
-    fig.update_traces(
-        marker=dict(
-            size=8,
-            opacity=0.7,
-            line=dict(
-                width=0.02,
-                color='gray'
-            )
-        )
-    )
-
-    # Actualizar layout
-    fig.update_layout(
-        title="PC2 vs. PC1 (2D)",
-        title_x=0.3,  # Centrar el título
-        showlegend=True,  # Asegurar que la leyenda esté visible
-        legend=dict(
-            title=dict(text='Madurez'),  # Título de la leyenda
-            itemsizing='constant',  # Tamaño constante para los elementos de la leyenda
-            font=dict(color='white'),
-        ),
-        font=dict(color='white'),
-        paper_bgcolor='rgb(0, 0, 0)',
-        plot_bgcolor='rgb(0, 0, 0)',
-    )
-
-    return fig
-
-
-grafico2d1 = generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
-
-###################
-### Gráfico 2D 2###
-###################
-
-
-def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Limpiar posibles espacios o caracteres invisibles en 'Madurez'
-    df['Madurez'] = df['Madurez'].astype('category')
     
-    # Normalización de PCA
-    df_pca2 = df_normalizado.to_numpy()
-    df_pca2 = df_pca2[:, 1:4]  # Selección de las primeras tres componentes principales
+    # Preparar datos del PCA de manera eficiente
+    if isinstance(df_normalizado, pd.DataFrame):
+        # Si ya es DataFrame, extraer columnas (al menos necesitamos 3)
+        if df_normalizado.shape[1] >= 4:
+            pca_cols = df_normalizado.iloc[:, 1:4].values
+        else:
+            # Fallback si no hay suficientes columnas
+            return None
+    else:
+        # Si es numpy array
+        df_pca2 = df_normalizado
+        if df_pca2.shape[1] >= 4:
+            pca_cols = df_pca2[:, 1:4]
+        else:
+            # Fallback si no hay suficientes columnas
+            return None
 
     # Crear DataFrame para Plotly
-    pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Madurez']
-    pca_df['Lugar'] = dataset_complete['Lugar']
+    pca_df = pd.DataFrame(pca_cols, columns=['PCA1', 'PCA2', 'PCA3'])
+    
+    # Asegurar que 'Madurez' está presente, con fallback a 'Etapa_Madurez'
+    if 'Madurez' in df.columns:
+        pca_df['Madurez'] = df['Madurez']
+    elif 'Etapa_Madurez' in df.columns:
+        pca_df['Madurez'] = df['Etapa_Madurez']
+    else:
+        # Si ninguno está disponible, usar un valor predeterminado
+        pca_df['Madurez'] = 'Desconocido'
+    
+    # Añadir columna de Lugar
+    if 'Lugar' in dataset_complete.columns:
+        pca_df['Lugar'] = dataset_complete['Lugar']
+    
+    # Limitar número de puntos para mejor rendimiento
+    if len(pca_df) > max_points:
+        # Asegurar que el lugar seleccionado permanezca
+        lugar_df = None
+        if lugar_seleccionado:
+            lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
+        
+        # Muestrear el resto
+        resto_df = pca_df[pca_df['Lugar'] != lugar_seleccionado]
+        # Cuántos puntos muestrear
+        muestra_size = max_points - (0 if lugar_df is None else len(lugar_df))
+        if muestra_size > 0 and len(resto_df) > muestra_size:
+            # Estratificar por Madurez
+            resto_muestra = resto_df.groupby('Madurez', group_keys=False).apply(
+                lambda x: x.sample(min(int(muestra_size * len(x) / len(resto_df)) + 1, len(x)), random_state=42)
+            )
+            # Combinar con lugar seleccionado
+            if lugar_df is not None and not lugar_df.empty:
+                pca_df = pd.concat([lugar_df, resto_muestra])
+            else:
+                pca_df = resto_muestra
 
-    # Definir un mapa de colores más contrastante
-    color_map = {
-        'Optimización': '#51C622',
-        'Definición': '#CC6CE7',
-        'En desarrollo': '#D20103',
-        'Inicial': '#5DE2E7'
-    }
+    # Título por defecto si no se proporciona
+    if title is None:
+        title = f"{x_col} vs. {y_col} (2D)"
 
-    # Crear el gráfico asegurando consistencia en los colores
+    # Crear gráfico 2D optimizado
     fig = px.scatter(
-        pca_df,
-        x='PCA1',
-        y='PCA3',
-        labels={'PCA1': 'Componente PC1', 'PCA3': 'Componente PC3'},
-        hover_data=['Lugar'],  # Información adicional en el hover
-        color='Etapa_Madurez',  # <- Especificar la columna para asignar colores
-        # category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
-        color_discrete_map=color_map  # Asignar colores específicos a las categorías
+        pca_df, 
+        x=x_col, y=y_col,
+        color='Madurez',
+        labels={x_col: f'Componente {x_col}', 
+                y_col: f'Componente {y_col}'},
+        hover_data=['Lugar'],
+        category_orders={'Madurez': list(color_map.keys())},
+        color_discrete_map=color_map
     )
-
-    # Manejar lugar seleccionado
+    
+    # Resaltar lugar seleccionado
     if lugar_seleccionado:
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
         if not lugar_df.empty:
             fig.add_trace(
                 go.Scatter(
-                    x=lugar_df['PCA1'],
-                    y=lugar_df['PCA3'],
+                    x=lugar_df[x_col],
+                    y=lugar_df[y_col],
                     mode='markers',
-                    marker=dict(size=12, color='orange', symbol='diamond'),
+                    marker=dict(
+                        size=12,
+                        color='orange',
+                        symbol='diamond'
+                    ),
                     name=f"Lugar: {lugar_seleccionado}"
                 )
             )
 
-    # Ajustar el estilo del gráfico
+    # Estilo de marcadores
     fig.update_traces(
         marker=dict(
             size=8,
@@ -1268,16 +935,17 @@ def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado
                 width=0.5,
                 color='gray'
             )
-        )
+        ),
+        selector=dict(mode='markers')
     )
 
-    # Actualizar el layout del gráfico
+    # Layout optimizado
     fig.update_layout(
-        title="PC1 vs. PC3 (2D)",
-        title_x=0.5,  # Centrar el título
+        title=title,
+        title_x=0.5,
         showlegend=True,
         legend=dict(
-            title=dict(text='Etapa de Madurez'),
+            title=dict(text='Madurez'),
             itemsizing='constant'
         ),
         paper_bgcolor='rgb(0, 0, 0)',
@@ -1287,30 +955,45 @@ def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado
 
     return fig
 
-
-
-
-grafico2d2 = generar_grafico_2d2(datos, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
-
-###################
-### Gráfico 2D 3###
-###################
-
-
-def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+# 3. Función optimizada para generar los tres gráficos 2D a la vez
+@st.cache_data
+def generar_todos_graficos_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None, max_points=2000):
+    """
+    Genera los tres gráficos 2D en una sola pasada para mejorar rendimiento
+    """
+    graphs = {}
     
-    # Normalización de PCA
-    df_pca2 = df_normalizado.to_numpy()
-    df_pca2 = df_pca2[:, 1:4]
+    # Generar cada gráfico con componentes específicos
+    graphs['grafico2d1'] = generar_grafico_2d(
+        df, df_normalizado, dataset_complete, lugar_seleccionado, 
+        max_points, 'PCA1', 'PCA2', "PC1 vs. PC2 (2D)"
+    )
+    
+    graphs['grafico2d2'] = generar_grafico_2d(
+        df, df_normalizado, dataset_complete, lugar_seleccionado, 
+        max_points, 'PCA1', 'PCA3', "PC1 vs. PC3 (2D)"
+    )
+    
+    graphs['grafico2d3'] = generar_grafico_2d(
+        df, df_normalizado, dataset_complete, lugar_seleccionado, 
+        max_points, 'PCA2', 'PCA3', "PC2 vs. PC3 (2D)"
+    )
+    
+    return graphs
 
-    # Crear DataFrame para Plotly
-    pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Madurez'].astype('category')
-    pca_df['Lugar'] = dataset_complete['Lugar']
 
-    # Definir un mapa de colores estricto
+
+
+
+# Optimización 5: Gráficos de análisis de clústers y correlaciones
+
+# 1. Optimizar boxplot por clúster
+@st.cache_data
+def boxplot_por_cluster(df, variable, max_points=2000):
+    """
+    Versión optimizada del boxplot por clúster
+    """
+    # Mapa de colores predefinido
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
@@ -1318,131 +1001,69 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
         'Inicial': '#5DE2E7'
     }
 
-    # Crear el gráfico de dispersión 2D
-    fig = px.scatter(pca_df, 
-                     x='PCA2', y='PCA3',
-                     color='Madurez',
-                     labels={'PCA2': 'Componente PC2', 
-                            'PCA3': 'Componente PC3'},
-                     hover_data=['Lugar'],
-                     category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
-                     color_discrete_map=color_map)
-
-    # Manejar lugar seleccionado
-    if lugar_seleccionado:
-        lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
-        if not lugar_df.empty:
-            # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
-            fig.add_trace(
-                px.scatter(lugar_df, 
-                           x='PCA2', y='PCA3', hover_data=['Lugar'],
-                           color_discrete_map={'Madurez': 'green'}).data[0]
-            )
-            fig.update_traces(marker=dict(size=10, color='green', opacity=1), 
-                             selector=dict(name=lugar_seleccionado))
-
-    # Actualizar estilo de los marcadores
-    fig.update_traces(
-        marker=dict(
-            size=8,
-            opacity=0.7,
-            line=dict(
-                width=0.02,
-                color='gray'
-            )
+    # Usar solo las columnas necesarias
+    df_subset = df[['Madurez', 'Lugar', variable]].copy()
+    
+    # Calcular estadísticas eficientemente mediante groupby
+    stats = df_subset.groupby('Madurez')[variable].agg(['mean', 'median', 'std']).reset_index()
+    stats.columns = ['Madurez', 'mean_' + variable, 'median_' + variable, 'std_' + variable]
+    
+    # Unir estadísticas al DataFrame principal
+    df_with_stats = pd.merge(df_subset, stats, on='Madurez', how='left')
+    
+    # Limitar puntos si hay demasiados
+    if len(df_with_stats) > max_points:
+        df_with_stats = df_with_stats.groupby('Madurez', group_keys=False).apply(
+            lambda x: x.sample(min(int(max_points * len(x) / len(df_with_stats)), len(x)), random_state=42)
         )
-    )
-
-    # Actualizar layout
-    fig.update_layout(
-        title="PC3 vs. PC2 (2D)",
-        title_x=0.3,  # Centrar el título
-        showlegend=True,  # Asegurar que la leyenda esté visible
-        legend=dict(
-            title=dict(text='Madurez'),  # Título de la leyenda
-            itemsizing='constant',  # Tamaño constante para los elementos de la leyenda
-            font=dict(color='white'),
-        ),
-        font=dict(color='white'),
-        paper_bgcolor='rgb(0, 0, 0)',
-        plot_bgcolor='rgb(0, 0, 0)',
-    )
-
-    return fig
-
-
-grafico2d3 = generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
-
-
-#########################
-### Box plots by group ##
-#########################
-
-def boxplot_por_cluster(df, variable):
-    """
-    Genera un único boxplot con todos los puntos, coloreados según el clúster.
-    El tooltip muestra el 'lugar', la media, mediana y desviación estándar del clúster correspondiente.
     
-    Parameters:
-        df (pd.DataFrame): El DataFrame de entrada.
-        variable (str): La columna para analizar.
-    """
-    # Definir el nuevo mapa de colores para los clusters
-    color_map = {
-        'Optimización': '#51C622',
-        'Definición': '#CC6CE7',
-        'En desarrollo': '#D20103',
-        'Inicial': '#5DE2E7'
-    }
-
-    # Calcular estadísticas para cada cluster y agregarlas al DataFrame
-    stats = df.groupby('Madurez')[variable].agg(['mean', 'median', 'std']).reset_index()
-    stats.rename(columns={'mean': 'mean_' + variable, 'median': 'median_' + variable, 'std': 'std_' + variable}, inplace=True)
-    df = pd.merge(df, stats, on='Madurez', how='left')
-
-    # Crear el boxplot con todos los puntos
+    # Crear el boxplot optimizado
     fig = px.box(
-        df,
+        df_with_stats,
         y=variable,
-        points='all',
+        points='all',  # Mostrar todos los puntos
         title=f'Diagrama de caja de la variable\n"{variable}"',
         labels={variable: variable},
         template='plotly_dark',
-        color='Madurez',  # Colorear los puntos según el cluster
-        color_discrete_map=color_map,  # Usar el mapa de colores actualizado
+        color='Madurez',
+        color_discrete_map=color_map,
         hover_data={
             'Madurez': True, 
-            'Lugar': True,  # Mostrar el lugar en el tooltip
-            'mean_' + variable: True,  # Mostrar la media en el tooltip
-            'median_' + variable: True,  # Mostrar la mediana en el tooltip
-            'std_' + variable: True,  # Mostrar la desviación estándar en el tooltip
+            'Lugar': True,
+            'mean_' + variable: ':.2f',
+            'median_' + variable: ':.2f',
+            'std_' + variable: ':.2f',
         }
     )
 
-    # Actualizar las trazas para los bordes de los puntos (naranja claro)
-    fig.update_traces(marker=dict(
-        opacity=0.6,
-        line=dict(color='rgba(255, 165, 0, 0.5)', width=1)  # Borde en color naranja claro
-    ))
-    # Mostrar el gráfico
+    # Mejorar estilo de marcadores
+    fig.update_traces(
+        marker=dict(
+            opacity=0.6,
+            size=5,  # Puntos más pequeños para mejor rendimiento
+            line=dict(color='rgba(255, 165, 0, 0.5)', width=0.5)
+        ),
+        jitter=0.5,  # Añadir dispersión para evitar superposición
+        boxpoints='outliers'  # Solo mostrar outliers como puntos para mejorar rendimiento
+    )
+    
+    # Optimizar layout
+    fig.update_layout(
+        template='plotly_dark',
+        boxmode='group',  # Agrupar cajas por categoría
+        boxgap=0.5,  # Espacio entre grupos
+        boxgroupgap=0.2  # Espacio entre cajas del mismo grupo
+    )
+    
     return fig
 
-boxplots_clusters = boxplot_por_cluster(datos, variable_seleccionada_numerica)
-
-################################
-### Histrograma por cluster ####
-################################
-
-def plot_histogram(df, numeric_column):
+# 2. Optimizar histograma por clúster
+@st.cache_data
+def plot_histogram_clusters(df, numeric_column, nbins=30):
     """
-    Crea un histograma de superposición para cada clúster, usando colores basados en el mapa de colores proporcionado,
-    y agrega recuadros con las estadísticas distribuidos de manera organizada.
-    
-    Parameters:
-        df (pd.DataFrame): El DataFrame de entrada.
-        numeric_column (str): La columna numérica para el histograma.
+    Versión optimizada del histograma por clúster
     """
-    # Mapa de colores para los clusters
+    # Mapa de colores
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
@@ -1450,102 +1071,120 @@ def plot_histogram(df, numeric_column):
         'Inicial': '#5DE2E7'
     }
     
-    # Crear el histograma con superposición por cluster
-    fig = px.histogram(df, 
-                      x=numeric_column, 
-                      color='Madurez',
-                      color_discrete_map=color_map,
-                      opacity=0.6,
-                      title=f'Histograma de la variable "{numeric_column}"')
+    # Usar solo columnas necesarias
+    df_subset = df[['Madurez', numeric_column]].copy()
     
-    # Actualizar los ejes
+    # Crear el histograma optimizado
+    fig = px.histogram(
+        df_subset, 
+        x=numeric_column, 
+        color='Madurez',
+        color_discrete_map=color_map,
+        opacity=0.6,
+        nbins=nbins,
+        title=f'Histograma de la variable "{numeric_column}"'
+    )
+    
+    # Actualizar ejes
     fig.update_xaxes(title_text="Rangos de valor")
     fig.update_yaxes(title_text="Frecuencia absoluta")
     
-    # Calcular estadísticas por cada nivel de madurez
-    annotations = []
+    # Calcular estadísticas de manera más eficiente usando groupby
+    stats_df = df_subset.groupby('Madurez')[numeric_column].agg(['mean', 'median', 'std']).reset_index()
     
-    # Definir posiciones para los recuadros (dos columnas)
+    # Calcular la moda por grupo separadamente (es más costosa)
+    mode_by_group = {}
+    for level in df_subset['Madurez'].unique():
+        subset = df_subset[df_subset['Madurez'] == level]
+        try:
+            mode_by_group[level] = subset[numeric_column].mode().iloc[0]
+        except (IndexError, KeyError):
+            mode_by_group[level] = None
+    
+    # Crear anotaciones de manera más eficiente
+    annotations = []
     positions = [
-        {'x': 1.15, 'y': 1.33},  # Primera columna, arriba
-        {'x': 1.15, 'y': 1},  # Primera columna, abajo
-        {'x': 1.15, 'y': 0.50},  # Segunda columna, arriba
-        {'x': 1.15, 'y': 0.02}   # Segunda columna, abajo
+        {'x': 1.15, 'y': 0.95},
+        {'x': 1.15, 'y': 0.75},
+        {'x': 1.15, 'y': 0.55},
+        {'x': 1.15, 'y': 0.35}
     ]
     
-    for i, level in enumerate(df['Madurez'].unique()):
-        # Filtrar los datos por nivel de madurez
-        subset = df[df['Madurez'] == level]
-        
-        # Calcular las estadísticas
-        mean = subset[numeric_column].mean()
-        median = subset[numeric_column].median()
-        mode = subset[numeric_column].mode()[0]
-        std = subset[numeric_column].std()
-        
-        # Crear un recuadro con las estadísticas
-        annotations.append(dict(
-            x=positions[i]['x'],
-            y=positions[i]['y'],
-            xref='paper',
-            yref='paper',
-            text=f'<b>{level}</b><br>Media: {mean:.2f}<br>Mediana: {median:.2f}<br>Moda: {mode:.2f}<br>Desviación estándar: {std:.2f}',
-            showarrow=False,
-            font=dict(size=10, color='black'),
-            bgcolor=color_map[level],
-            borderpad=4,
-            opacity=0.8,
-            align="left",
-            width=150
-        ))
+    # Iterar sobre los grupos para crear anotaciones
+    for i, (level, stats) in enumerate(stats_df.iterrows()):
+        if i < len(positions):
+            # Obtener estadísticas del grupo
+            level_name = stats['Madurez']
+            mean = stats['mean']
+            median = stats['median']
+            std = stats['std']
+            mode = mode_by_group.get(level_name, "N/A")
+            
+            # Crear anotación
+            annotations.append(dict(
+                x=positions[i]['x'],
+                y=positions[i]['y'],
+                xref='paper',
+                yref='paper',
+                text=f'<b>{level_name}</b><br>Media: {mean:.2f}<br>Mediana: {median:.2f}<br>Desv. estándar: {std:.2f}',
+                showarrow=False,
+                font=dict(size=10, color='black'),
+                bgcolor=color_map[level_name],
+                borderpad=4,
+                opacity=0.8,
+                align="left",
+                width=150
+            ))
     
-    # Añadir todas las anotaciones al gráfico
+    # Añadir anotaciones al gráfico
     for annotation in annotations:
         fig.add_annotation(annotation)
     
-    # Actualizar el layout para dar espacio a las anotaciones
+    # Actualizar layout
     fig.update_layout(
         template='plotly_dark',
         showlegend=False,
-        margin=dict(r=250),  # Aumentar el margen derecho para las anotaciones
-        height=400  # Aumentar la altura para mejor distribución
+        margin=dict(r=250),
+        height=400
     )
     
     return fig
 
-histograma_por_clusters = plot_histogram(datos, variable_seleccionada_numerica)
-
-##############
-### Scatter ##
-##############
-
-def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_variable):
+# 3. Optimizar scatter plot con regresión
+@st.cache_data
+def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_variable, max_points=2000):
     """
-    Generates a scatter plot with annotations including adjusted R² and regression line equation.
-    Handles missing values in the dataset.
+    Versión optimizada del scatter plot con regresión
     """
-    # Drop rows with missing values in relevant columns
-    df_clean = df.dropna(subset=[x_variable, y_variable])
-
-    # Define a custom color map for clusters
+    # Mapa de colores
     color_map = {
-        'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
-        'Inicial': '#5DE2E7',    # Cluster 1 -> Turquesa
-        'Definición': '#CC6CE7',    # Cluster 2 -> Amarillo
-        'Optimización': '#51C622',    # Cluster 3 -> Verde oscuro
+        'En desarrollo': '#D20103',
+        'Inicial': '#5DE2E7',
+        'Definición': '#CC6CE7',
+        'Optimización': '#51C622',
     }
 
-    # Create the scatter plot
+    # Usar solo las columnas necesarias y limpiar NaN
+    df_clean = df[['Lugar', x_variable, y_variable, categorical_variable]].dropna(subset=[x_variable, y_variable])
+    
+    # Limitar número de puntos para mejor rendimiento
+    if len(df_clean) > max_points:
+        df_clean = df_clean.groupby(categorical_variable, group_keys=False).apply(
+            lambda x: x.sample(min(int(max_points * len(x) / len(df_clean)), len(x)), random_state=42)
+        )
+
+    # Crear el scatter plot
     fig = px.scatter(
         df_clean,
         x=x_variable,
         y=y_variable,
         hover_data={'Lugar': True, categorical_variable: True},
         color=categorical_variable,
-        color_discrete_map=color_map
+        color_discrete_map=color_map,
+        opacity=0.7  # Reducir opacidad para ver mejor patrones
     )
 
-    # Compute adjusted R² and regression line equation
+    # Calcular regresión de manera eficiente
     X = df_clean[[x_variable]].values
     y = df_clean[y_variable].values
     model = LinearRegression()
@@ -1554,514 +1193,1339 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
     intercept = model.intercept_
     slope = model.coef_[0]
     r_squared = model.score(X, y)
+    
+    # Calcular R² ajustado
     n = len(df_clean)
-    p = 1  # Only one independent variable
+    p = 1
     r_squared_adj = 1 - ((1 - r_squared) * (n - 1) / (n - p - 1))
 
-    # Regression line equation
-    regression_equation = f"y = {slope:.2f}x + {intercept:.2f}"
+    # Ecuación de regresión
+    regression_equation = f"y = {slope:.4f}x + {intercept:.4f}"
 
-    # Add the regression line to the scatter plot
-    x_range = np.linspace(df_clean[x_variable].min(), df_clean[x_variable].max(), 100)
+    # Añadir línea de regresión de manera eficiente
+    x_min, x_max = df_clean[x_variable].min(), df_clean[x_variable].max()
+    x_range = np.linspace(x_min, x_max, 50)  # Reducir puntos para mejor rendimiento
     y_predicted = slope * x_range + intercept
+    
     fig.add_scatter(
         x=x_range,
         y=y_predicted,
         mode='lines',
-        name='Regression Line',
-        line=dict(color='orange', dash='dash')
+        name='Regresión',
+        line=dict(color='orange', dash='dash', width=1.5)
     )
 
-    # Update layout
+    # Optimizar layout
     fig.update_layout(
-        plot_bgcolor='rgb(30,30,30)',  # Dark background
-        paper_bgcolor='rgb(30,30,30)',  # Dark paper background
-        font_color='white',  # White font
+        plot_bgcolor='rgb(30,30,30)',
+        paper_bgcolor='rgb(30,30,30)',
+        font_color='white',
         title=dict(
             text=f"Scatter Plot: '{x_variable}' vs '{y_variable}'",
-            font=dict(color='white')  # Title font color
+            font=dict(color='white')
         ),
         xaxis=dict(
             title=f"Variable: {x_variable}",
             titlefont=dict(color='white'),
-            tickfont=dict(color='white')
+            tickfont=dict(color='white'),
+            showgrid=True,
+            gridcolor='rgba(100,100,100,0.2)'
         ),
         yaxis=dict(
             title=f"Variable: {y_variable}",
             titlefont=dict(color='white'),
-            tickfont=dict(color='white')
+            tickfont=dict(color='white'),
+            showgrid=True,
+            gridcolor='rgba(100,100,100,0.2)'
         ),
+        # Añadir anotaciones de manera más eficiente
         annotations=[
             dict(
-                xref='paper',
-                yref='paper',
-                x=0.95,
-                y=1.05,
+                xref='paper', yref='paper',
+                x=0.95, y=1.05,
                 text=f'R² Ajustada: {r_squared_adj:.4f}',
                 showarrow=False,
-                font=dict(color='orange')
+                font=dict(color='orange', size=12)
             ),
             dict(
-                xref='paper',
-                yref='paper',
-                x=0.05,
-                y=1.05,
+                xref='paper', yref='paper',
+                x=0.05, y=1.05,
                 text=f'Regresión: {regression_equation}',
                 showarrow=False,
-                font=dict(color='orange')
+                font=dict(color='orange', size=12)
             )
-        ]
-    )
-
-    # Customize hover template
-    fig.update_traces(
-        hovertemplate='<b>Municipio</b>: %{customdata[0]}<br>' +
-                      f'<b>{x_variable}</b>: %{{x}}<br>' +
-                      f'<b>{y_variable}</b>: %{{y}}<br>'
-    )
-    fig.update_traces(
-        marker=dict(opacity=0.9, line=dict(color='rgba(255, 165, 0, 0.5)', width=1))
-    )
-
-    return fig
-
-# Call the function to generate scatter plot
-fig_scatter = generate_scatter_with_annotations(input_datos, variable_seleccionada_numerica, variable_seleccionada_paracorrelacion, variable_seleccionada_categorica)
-
-##################################
-###### Mapa completo #############
-##################################
-
-def generar_mapa_con_lugar(df, lugar=None):
-    # Definir el mapa de colores para los clústeres
-
-    color_map = {
-        'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
-        'Inicial': '#5DE2E7',    # Cluster 1 -> Turquesa
-        'Definición': '#CC6CE7',    # Cluster 2 -> Amarillo
-        'Optimización': '#51C622',    # Cluster 3 -> Verde oscuro
-    }
-
-    # Asegurarse de que 'Cluster2' sea categórico
-    df['Madurez'] = df['Madurez'].astype('category')
-
-    # Crear el mapa con Plotly usando scatter_mapbox
-    fig = px.scatter_mapbox(
-        df,
-        lat="Latitud",
-        lon="Longitud",
-        color="Madurez",  # Usamos 'Cluster2' para definir el color
-        opacity=0.8,
-        hover_data=["Madurez", "Lugar"],  # Mostrar información al pasar el cursor
-        zoom=4,  # Nivel de zoom inicial
-        center={"lat": 23.6345, "lon": -102.5528},  # Coordenadas centrales de México
-        title="Mapa de Clústers por Madurez Digital en México",
-        color_discrete_map=color_map  # Aplicar el mapa de colores definido
-    )
-
-    # Resaltar el lugar seleccionado si se proporciona el parámetro 'lugar'
-    if lugar:
-        lugar_df = df[df['Lugar'] == lugar]
-        if not lugar_df.empty:
-            # Añadir un marcador especial para el lugar seleccionado
-            fig.add_trace(
-                px.scatter_mapbox(
-                    lugar_df,
-                    lat="Latitud",
-                    lon="Longitud",
-                    color_discrete_map={0: '#ffa500', 1: '#ffa500', 2: '#ffa500', 3: 'ffa500'},  # Resaltar en amarillo
-                    size_max=10,  # Tamaño máximo de marcador
-                    size=[8],  # Tamaño del marcador en puntos
-                    hover_data=["Madurez", "Lugar"]
-                ).data[0]
-            )
-
-    # Configurar el estilo del mapa a uno oscuro y ajustar diseño
-    fig.update_layout(
-        mapbox_style="carto-darkmatter",  # Estilo oscuro del mapa
-        height=600,  # Altura del mapa
-        margin={"r": 0, "t": 50, "l": 0, "b": 0},  # Márgenes del gráfico
+        ],
         legend=dict(
-            title="Nivel de Madurez",  # Título de la leyenda
-            itemsizing="constant",  # Tamaño constante en ítems
-            traceorder="normal"  # Orden normal de la leyenda
+            title=categorical_variable,
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1
         )
     )
 
-    # Retornar la figura para usar en Streamlit
-    return fig
-
-fig_map_final = generar_mapa_con_lugar(input_datos, lugar = variable_seleccionada_municipio)
-
-
-###################################
-#### Recuento de Clusters #########
-###################################
-def recuento(df):
-    # Contar el total de registros en la columna 'Lugar'
-    total_municipios = len(df)
-
-    # Contar el número de registros por cada nivel de madurez
-    counts = df['Madurez'].value_counts()
-
-    # Calcular la frecuencia relativa
-    df_counts = counts.reset_index()
-    df_counts.columns = ['Madurez', 'Cantidad']
-    df_counts['Frecuencia relativa'] = df_counts['Cantidad'] / total_municipios
-
-    # Definir el color map personalizado
-    color_map = {
-        'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
-        'Inicial': '#5DE2E7',          # Cluster 1 -> Turquesa
-        'Definición': '#CC6CE7',       # Cluster 2 -> Amarillo
-        'Optimización': '#51C622',     # Cluster 3 -> Verde oscuro
-    }
-
-    # Crear el gráfico de barras para la frecuencia relativa usando Plotly
-    fig = px.bar(df_counts, 
-                 x='Madurez', 
-                 y='Frecuencia relativa', 
-                 title="Frecuencia relativa por nivel de madurez",
-                 labels={'Frecuencia relativa': 'Frecuencia relativa', 'Nivel de madurez': 'Nivel de madurez'},
-                 color='Madurez', 
-                 color_discrete_map=color_map,  # Usar el color map personalizado
-                 category_orders={'Madurez': ['Inicial', 'En desarrollo', 'Definición', 'Optimización']},  # Cambiar el orden
-                 height=280)  # Reducir la altura del gráfico
-    
-    return fig
-
-recuento_clusters = recuento(datos)
-
-
-##################################
-### Título Dinámico Variable #####
-##################################
-def titulo_dinamico(variable):
-
-    # Set a yellow color for the title
-    styled_title = f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">La variable mostrada es: "{variable}".</span>'
-
-    return styled_title
-
-Titulo_dinamico = titulo_dinamico(variable=variable_seleccionada_numerica)
-
-
-###################################
-### Título Dinámico Municipio #####
-###################################
-def titulo_dinamico2(variable):
-
-    # Set a yellow color for the title
-    styled_title = f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">Municipio de "{variable}".</span>'
-
-    return styled_title
-
-Titulo_dinamico2 = titulo_dinamico2(variable=variable_seleccionada_municipio)
-
-###########################################
-### Título Dinámico Municipio Madurez #####
-###########################################
-def titulo_dinamico3(variable):
-
-    # Set a yellow color for the title
-    styled_title = f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">Análisis de Madurez Digital de "{variable}".</span>'
-
-    return styled_title
-
-Titulo_dinamico3 = titulo_dinamico3(variable=variable_seleccionada_municipio)
-
-
-
-# Dashboard Main Panel
-# calculos_df
-# Define the tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Presentación", "Municipio", "Madurez Digital","Estadísiticas por Grupo", "Análisis Relacional","Geografía"])
-
-
-
-# Aquí asumo que ya tienes definidos los gráficos:
-# fig_municipio: tu gráfico de Folium (mapa)
-# fig_boxplot: tu gráfico de Plotly (box plot)
-# fig_hist: tu gráfico de Plotly (histograma)
-
-# Crear pestaña con las visualizaciones
-
-with tab1:
-    # Expander con información adicional
-    with st.expander('¿Para qué sirve esta aplicación?', expanded=False):
-        st.markdown(f'Provee un punto de referencia estadísticamente robusto, claro y preciso —con un criterio basado en aprendizaje automático y poder computacional, sin intervención humana, solo considerando las principales características de los municipios—, para efectos de que puedas ver dónde está cada municipio de México en su trayectoria hacia la <span style="color:#51C622">"Madurez Digital"</span> y qué características debe considerar para favorecer su transición a la siguiente fase del ciclo de transformación digital.', unsafe_allow_html=True)
-
-        st.markdown(f'Permíteme compartir tres elementos que motivaron la creación de esta aplicación:', unsafe_allow_html=True)
-        
-        st.markdown(f'1. <span style="color:#51C622">La madurez digital</span> es multifactorial, incluye una combinación precisa de factores adicionales a los tradicionales como el acceso a Internet, los servicios de conectividad o dispositivos (socio-económicos, infraestructura y demográficos). Para algunos países, la plenitud digital requiere de la definición incluso de una canasta básica de productos digitales que cualquier hogar o ciudadano debe tener.', unsafe_allow_html=True)
-
-        st.markdown(f'''
-        <div style="text-align: center; padding-left: 40px;">
-            Uno de mis libros favoritos, escrito por 
-            <span style="color:#51C622">Antoine Augustin Cournot</span> (1897, página 
-            <span style="color:#51C622">24</span>) 
-            <a href="http://bibliotecadigital.econ.uba.ar/download/Pe/181738.pdf" target="_blank">
-                <em>Researches Into the Mathematical Principles of the Theory of Wealth Economic</em>
-            </a>, destaca la necesidad de un punto de referencia para efectos de evaluar las variaciones relativas y absolutas de los elementos en cualquier sistema (pone como ejemplo, al sistema solar y el papel del modelo de Kepler como punto de referencia para medir las variaciones de cada planeta y el sol, haciéndonos conscientes de los verdaderos movimientos de cada cuerpo planetario).
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown(f'3. La <span style="color:#C2185B">Inteligencia Artificial Generativa (Consulta realizada a Search Labs, <span style="color:#C2185B">Diciembre 2024</span></span>: <i>“does science need reference points?”</i>), también sostiene que <i>“…la ciencia necesita puntos de referencia porque proveen un punto fijo de comparación para medir de manera precisa y describir un fenómeno”</i>. Entre estos fenómenos están, por ejemplo, el movimiento planetario, las preferencias de consumidores, las ventas, la distribución del ingreso, la competencia en un mercado y la madurez digital.', unsafe_allow_html=True)
-
-        st.markdown(f'En este contexto, esta aplicación consiste en el marco de referencia para saber con precisión dónde están los municipios en su ciclo de madurez digital y describir el fenómeno.', unsafe_allow_html=True)
-
-        st.markdown(f'Este aplicativo es resultado de un <span style="color:#51C622">modelo de aprendizaje automático no supervisado</span> seleccionado de entre <span style="color:#51C622">450 modelos</span> y más de <span style="color:#51C622">un millón de iteraciones</span> para cada evaluación, con el fin de obtener una clasificación eficiente y precisa sin ningún criterio ajeno a las <span style="color:#51C622">181 características</span> medibles para cada municipio en México. Constituye un marco de referencia objetivo y preciso para ubicar al mununicipio de tu interés y compararlo con el total de municipios con miras a mejorar su madurez digital o conocer sus aptitudes para el desarrollo de negocios digitales. Asimismo, proporciona insights relevantes encuanto a la transición de un estado de madurez a otro y de las diferencias entre cada clasificación de municipios.', unsafe_allow_html=True)
-
-        st.markdown(f'<div style="text-align: right;">Rodrigo Guarneros Gutiérrez<br><span style="color:#51C622">Ciudad de México, 20.12.2024</span></div>', unsafe_allow_html=True)
-
-    with st.expander('¿Qué es la madurez digital?', expanded=False):
-        st.markdown(f'En la inteligencia de negocios existen modelos de maduración para las organizaciones y empresas con el objeto de evaluar la toma decisiones basada en datos (Gartner 2004, AMR Research, Service Oriented Business Intelligence Maturirty Model (SOBIMM), entre otros descritos por <a href="https://aulavirtual.infotec.mx/pluginfile.php/115302/mod_label/intro/Medici%C3%B3n%20de%20Madurez%20en%20la%20Implementaci%C3%B3n%20de%20Inteligencia%20de%20Negocios.pdf" target="_blank"><b>Urbina Nájera y Medina-Barrera (2021)</b></a>), la Unión Europea desarrolló la metodología para evaluar la madurez digital de los gobiernos locales (<a href="https://data.europa.eu/en/news-events/news/lordimas-digital-maturity-assessment-tool-regions-and-cities" target="_blank"><b>LORDIMAS 2023, Digital Maturity Index for local governments</b></a>), no existe un enfoque único para evaluar la madurez digital de las regiones o localidades donde el ciudadano sea el objeto de estudio. No obstante, algunos países reconocen el papel de los servicios digitales y financieros como elementos fundamentales para hacer negocios y generar bienestar en una región. Por ello, han definido en sus estándares de desarrollo una canasta básica de bienes y servicios digitales.', unsafe_allow_html=True)
-
-        st.markdown(f'Con base en los resultados del modelo de aprendizaje automático seleccionado para clasificar a los municipios, se identifican 4 etapas de madurez digital:', unsafe_allow_html=True)
-
-        # Imagen
-        st.image("fuentes/MDM_madurez1.png", caption="Modelo de Madurez Digital", use_column_width=True)
-
-        st.markdown(f'<b style="color:#51C622">Etapa 1 (Inicial):</b> En esta etapa, los municipios tienen el desempeño más bajo en todas las variables relevantes identificadas.', unsafe_allow_html=True)
-        
-        st.markdown(f'<b style="color:#51C622">Etapa 2 (Desarrollo):</b> Los municipios tienen un avance en la dirección de más servicios digitales presentes con impacto en las variables de infraestructura, socio-económicos y demográficos.', unsafe_allow_html=True)
-
-        st.markdown(f'<b style="color:#51C622">Etapa 3 (Definición):</b> Claramente se trata de municipios con una penetración promedio en los servicios digitales y un ecosistema financiero más vibrante.', unsafe_allow_html=True)
-
-        st.markdown(f'<b style="color:#51C622">Etapa 4 (Optimización):</b> Los municipios alcanzan una mejor plenitud digital, se nota un balance en sus características que permiten mejor desempeño digital con beneficios tangibles para sus ciudadanos, generando un ecosistema propicio para los negocios digitales y el bienestar.', unsafe_allow_html=True)
-
-    with st.expander('¿Cómo utilizar esta aplicación?', expanded=False):
-        st.markdown(f'Como se puede ver, se cuenta con 5 secciones adicionales:', unsafe_allow_html=True)
-        st.markdown(f'- <b style="color:#51C622">Municipio:</b> Una vez seleccionado el municipio, aquí encontrarás su ubicación geográfica, la distribución de las variables de interés y el ranking de ese municipio en el <b style="color:#51C622">Índice de madurez</b> construido con base en el modelo de aprendizaje automático.', unsafe_allow_html=True)
-        st.markdown(f'- <b style="color:#51C622">Madurez digital:</b> Profundiza sobre lo que significa el ranking de madurez digital para el municipio seleccionado. Conoce cada uno de los componentes o índices que construyen el índice de madures digital y los principales patrones encontrados', unsafe_allow_html=True)
-        st.markdown(f'- <b style="color:#51C622">Estadísticas por Grupo:</b> Esta sección presenta un análisis exploratorio de datos para cada clúster. Aprende más sobre las características de los otros clústers y las principales características del clúster del municipio que seleccionaste', unsafe_allow_html=True)
-        st.markdown(f'- <b style="color:#51C622">Correlaciones:</b> ¿Te interesa conocer la relación líneal entre dos variables o características de tu municipio? Utiliza esta sección para profundizar en la relación de cada variable', unsafe_allow_html=True)
-        st.markdown(f'- <b style="color:#51C622">Geografía:</b> ¿Qué hay de la consistencia geográfica? ¿Hace sentido la clasificación que nos proporciona el modelo? ¿Quiénes son los vecinos geográficos más cercanos al municipio de interés y de qué tipo son?', unsafe_allow_html=True)
-        st.image("fuentes/como_utilizar_1.png", caption="Página de Inicio.", use_column_width=True)
-        st.markdown(f'- <b style="color:#51C622">Barra de navegación:</b> Navega y selecciona el municipio de tu interés, las variables continuas y categóricas que quieres visualizar durante el análisis.', unsafe_allow_html=True)
-        st.image("fuentes/como_utilizar_2.png", caption="Se pueden seleccionar dos variables para análisis correlacional y una variable categórica.", use_column_width=True)
-        st.markdown(f'Conoce el enfoque de la programación orientada a objetos y detalles de la aplicación.', unsafe_allow_html=True)
-        st.image("fuentes/como_utilizar_3.png", caption="Enfoque de la aplicación y fuentes de información.", use_column_width=True)        
-
-
-    
-
-with tab2:
-    st.markdown(Titulo_dinamico2, unsafe_allow_html=True)
-    
-    # Expander con información adicional
-    with st.expander('Descripción', expanded=False):
-        st.markdown(f'Esta sección incluye cuatro visualizaciones relevantes para conocer mejor al municipio seleccionado y el lugar que tiene en la clasificación realizada por nuestra máquina de inferencia estadística. Se sugiere analizar en el siguiente orden:', unsafe_allow_html=True)
-        st.markdown(f'- Conoce el índice de madurez digital del municipio seleccionado y comparalo con el del resto de los municipios de México con el Ranking presentado en la primera gráfica: <span style="color:#51C622"> Gráfica de barras con el Índice de Madurez por Municipio, que resalta en rojo el municipio y el lugar que ocupa en el Ranking.</span>', unsafe_allow_html=True)
-        st.markdown(f'- Del lado derecho podrás encontrar el lungar del Municipio en el Ranking, la localización geográfica y el tipo de estado de madurez digital que tiene el municipio de acuerdo a su color: <span style="color:#51C622"> La geografía y sus vecinos cercanos es importante, profundiza más en la sección "Geografía" de esta aplicación.</span>.', unsafe_allow_html=True)
-        st.markdown(f'- Justo después del mapa, podrás encontrar los estádisticos básicos de la distribución estadística del <span style="color:#51C622"> Índice de Madurez Digital.</span> Visita el área de análisis de esta gráfica para conocer más.', unsafe_allow_html=True)
-        st.markdown(f'- Posteriormente, la siguiente gráfica: <span style="color:#51C622"> Histograma por variable</span>, te permite conocer la distribución de alguna variable de interés y combinarlo con las variables categóricas disponibles.', unsafe_allow_html=True)
-        st.markdown(f'- Finalmente, ubica en qué lugar se encuentra tu municipio en esa variable de interés, comparado con los demás municipios: <span style="color:#51C622"> Diagrama de caja</span>, que permite revisar a profundidad cuál es el rezago del municipio de interés en esa métrica específica.', unsafe_allow_html=True)
-    
-    # Crear dos columnas principales con proporción 4:6 para dar más espacio al mapa
-    col_izq, col_der = st.columns([6, 6])
-    
-    # Columna izquierda: solo el ranking
-    with col_izq:
-        st.plotly_chart(fig_ranking, width=400, use_container_width=True)
-
-    # Columna derecha: mapa y gráficos en secuencia vertical
-    with col_der:
-        st.plotly_chart(cuadro_resumen, width=400, use_container_width=True)
-        # Mapa ajustado al ancho de la columna
-        folium_static(fig_municipio, width=455, height=180)  # Ajusta estos valores según necesites
-        # Histograma después
-        with st.expander('Análisis', expanded=False):
-            st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
-            st.markdown(f'<b style="color:#51C622">- Un grupo grande con baja madurez digital (primera cresta)</b>. La cresta más alta alcanza aproximadamente 200 municipios, representa la mayor concentración de casos con 700 municipios. ', unsafe_allow_html=True)
-            st.markdown(f'<b style="color:#51C622">- Un grupo más pequeño pero significativo con alta madurez digital (segunda cresta)</b>. Este grupo se concentra en el rango de 0.6 a 0.7, la cresta alcanza 150 municipios y en el acumulado son 450 casos.', unsafe_allow_html=True)
-            st.markdown(f'<b style="color:#51C622">- Relativamente pocos casos en los niveles intermedios, lo que podría implicar una transición rápida una vez que incia el proceso de madurez digital.</b> Este valle entre los grupos sugiere a 500 municipios y representa una clara separación entre ambos grupos.', unsafe_allow_html=True)
-
-        st.plotly_chart(fig_hist_index, use_container_width=True)
-        st.plotly_chart(fig_hist, use_container_width=True)
-        # Boxplot al final
-        st.plotly_chart(fig_boxplot, use_container_width=True)
-# 3D
-
-with tab3:
-
-    st.markdown(Titulo_dinamico3, unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div style="text-align: justify;">
-            Maximiza la página para visualizar los tres Componentes Principales y sus patrones identificados. Visualiza cómo se complementan entre sí: <br>
-            - PC1 <span style="color:#51C622; font-weight:bold;">- Actividad financiera (volumen/intensidad);</span> <br>
-            - PC2 <span style="color:#51C622; font-weight:bold;">- Servicios digitales (infraestructura/acceso), y</span> <br>
-            - PC3 <span style="color:#51C622; font-weight:bold;">- Adopción financiera (diversificación/inclusión).</span> <br>
-            Con esta metodología se proporciona una visión muy completa del desarrollo financiero y digital de los municipios.
-        </div>
-        """,
-        unsafe_allow_html=True
+    # Optimizar hover template
+    fig.update_traces(
+        hovertemplate='<b>%{customdata[0]}</b><br>' +
+                    f'<b>{x_variable}</b>: %{{x:.2f}}<br>' +
+                    f'<b>{y_variable}</b>: %{{y:.2f}}<extra></extra>'
     )
 
-    # Configuración de las columnas
-    col1, col2 = st.columns([1, 1])  # La columna 1 será más ancha que la columna 2
+    return fig
 
-    with col1:
-        # Gráfico 3D en toda la columna 1
-        with st.expander('El significado de cada Componente Principal', expanded=False):            
-            st.markdown(
-                f'<span style="color:#51C622">Los componentes principales (PC1, PC2 y PC3) buscan maximizar la suma de las distancias al cuadrado entre los puntos proyectados y el origen</span>. Su resultado es una combinación lineal de todas las variables que los conforman. Así, la descomposición en valores singulares (SVD) nos permite visualizar en la gráfica la proyección de cada una de las combinaciones lineales en los municipios, representados en un espacio vectorial que va de -1 a 1 en cada eje del gráfico tridimensional.',
-                unsafe_allow_html=True)
-            
-            st.markdown(
-                f'Esta gráfica presenta los tres patrones más importantes encontrados en el análisis de componentes principales. Por el tipo de variables en cada componente principal y su peso relativo, se pueden identificar los siguientes patrones:',
-                unsafe_allow_html=True)
-            
-            st.markdown(
-                f'- <span style="color:#51C622">El componente principal primario (PC1)</span>, que explica el 48.23% de la varianza en todos los datos, puede considerarse como un <span style="color:#51C622">patrón o índice de actividad financiera</span>, asociado por orden de importancia a las siguientes características: (i) Ingresos promedio por vivienda; (ii) Terminales Punto de Venta (TPV); (iii) Transacciones con TPV de Banca Múltiple (BM); (iv) Transacciones en cajeros de BM; (v) Tarjetas de Débito; (vi) Ingresos promedio del sector comercial; (vii) Población Económicamente Activa (PEA); (viii) Cuentas Banca Popular; (ix) Cuentas de BM; (x) Transacciones N4 (personas de alto poder adquisitivo que prefieren servicios exclusivos sin límites de depósitos); (xi) Transacciones N3 (equivalentes a MX$81,112 pesos); (xii) Viviendas habitables, principalmente.',
-                unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Es significativo que el PC1 explique casi la mitad de la varianza total de los datos</span>, lo que sugiere que <b>la actividad financiera es el factor más diferenciador entre los municipios</b>.', unsafe_allow_html=True)
-            
-            st.markdown(
-                f'- <span style="color:#51C622">El segundo componente (PC2)</span>, que explica el 15% de la varianza en el total de los datos, se considera un <span style="color:#51C622">patrón o índice de servicios digitales</span>. Está asociado por orden de importancia con las siguientes variables: (i) PEA; (ii) Ingresos promedio por vivienda; (iii) Viviendas habitables; (iv) Viviendas con TV; (v) Viviendas con celular; (vi) Viviendas con audio radiodifundido; (vii) Transacciones TPV BM; (viii) Ingresos promedio del sector comercial; (ix) Viviendas con TV de paga; (x) Viviendas con Internet; (xi) Ingresos promedio del sector manufacturero; (xii) Cuentas con capacidad móvil, entre otras.',
-                unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Es significativo que la PEA tenga el mayor de los pesos en el componente principal PCA2, sugiriendo <b>una fuerte relación entre la Población Económicamente Activa y los servicios digitiales</b></span>.', unsafe_allow_html=True)
-            
-            st.markdown(
-                f'- <span style="color:#51C622">El tercer componente (PC3)</span>, que explica el 8.32% de la varianza total, se considera un <span style="color:#51C622">patrón o índice de adopción financiera</span>. Está asociado con las siguientes variables: (i) Transacciones TPV; (ii) Tarjetas de débito; (iii) Tarjetas de débito de Banca de Desarrollo; (iv) Cuentas de Banca Popular; (v) Cuentas de Cooperativas; (vi) PEA; (vii) Cuentas de Banca de Desarrollo; (viii) Cuentas N4; (ix) Cuentas de ahorro popular; (x) Cuentas de ahorro cooperativas; (xi) Viviendas habitables.',
-                unsafe_allow_html=True)
+# 4. Optimizar mapa con clústers
+@st.cache_data
+def generar_mapa_con_lugar(df, lugar=None, max_points=3000):
+    """
+    Versión optimizada del mapa con clústers
+    """
+    # Mapa de colores
+    color_map = {
+        'En desarrollo': '#D20103',
+        'Inicial': '#5DE2E7',
+        'Definición': '#CC6CE7',
+        'Optimización': '#51C622',
+    }
 
-            st.markdown(
-                f'- Mientras PC1 se centra en la actividad financiera general, PC3 captura específicamente la adopción de servicios financieros más específicos (banca popular, cooperativas, desarrollo) <span style="color:#C2185B">La presencia de diferentes tipos de cuentas y servicios financieros sugiere efectivamente un patrón de adopción más que de uso intensivo</span>.', unsafe_allow_html=True)
-
-            st.markdown(
-                f'- <span style="color:#51C622">En conclusión, la visualización 3D nos permite ver que estos grupos no son completamente discretos sino que hay transiciones suaves entre ellos, lo que sugiere <b>una transición continua de desarrollo financiero-digital en los municipios mexicanos</b>.</span>', unsafe_allow_html=True)
-
-
-
-
-        # Mostrar gráfico 3D
-        st.plotly_chart(grafico3d, use_container_width=True, height=500)
-
-
-        with st.expander('Patrones en los clústers', expanded=False):
-            st.markdown(f'La separación entre clústers tiene mejor visibilidad en tres dimensiones, en general se puede decir que:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">El clúster de los municipios en desarrollo (color rojo) es el más numeroso y disperso.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Los clústers Inicial (turquesa) y Definición (morado) muestran una cohesión interna mucho mayor.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">El clúster con los municipios en fase de Optimización (color verde) es el más compacto y diferenciado.</span>', unsafe_allow_html=True) 
-        st.plotly_chart(grafico2d1, use_container_width=True, height=250)
-
-    with col2:
-        # Solo una columna dentro de col2 para los gráficos 2D
-
-        with st.expander('Estructura de los clústers', expanded=False):
-            st.markdown(f'Esta segmentación, resultado de las similitudes en las 81 características de los municipios que propone la reducción dimensional, sugiere una clara estratificación de los municipios basada principalmente en su nivel de desarrollo financiero y económico, con subdivisiones adicionales basadas en infraestructura y acceso a servicios financieros especializados.', unsafe_allow_html=True)
-            st.markdown(f'En cuanto a la estructura de los clústers, se puede ver lo siguiente: <span style="color:#51C622">(i) Se identifican 4 grupos claramente diferenciados (clústers Inicio, En desarrollo, Definición y Optimización); (ii) la visualización en 2D y 3D muestra que estos grupos tienen fronteras relativamente bien definidas, y (iii) hay cierto solapamiento en las zonas de transición entre clústers, lo cual es natural en datos municipales que pueden compartir características</span>', unsafe_allow_html=True)
-            st.markdown(f'La distribución espacial en los clústers es también importante: <span style="color:#51C622">(i) el PCA1 (eje horizontal) explica la mayor variación, abarcando aproximadamente de -0.6 a 0.8; (ii) el PCA2 muestra una dispersión menor, aproximadamente de -0.5 a 0.5, y (iii) el PCA3 añade una dimensión adicional que ayuda a separar mejor algunos grupos que parecían solapados en 2D </span>.', unsafe_allow_html=True)
-        st.plotly_chart(grafico2d2, use_container_width=True, height=250)
-
-        with st.expander('Perfil del municipio en cada clúster', expanded=False):
-            st.markdown(f'El Clúster Inicial (turquesa) tiene las siguientes características:', unsafe_allow_html=True)
-
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo/Medio en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios con menor desarrollo financiero y digital, rurales o semi-urbanos con oportunidades de desarrollo en los tres aspectos. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b></span>', unsafe_allow_html=True) 
-
-
-            st.markdown(f'El Clúster en desarrollo (rojo) tiene las siguientes características:', unsafe_allow_html=True)
-
-            st.markdown(
-                f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo/medio en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios con alta actividad financiera pero con brechas en infraestructura digital. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b></span>', unsafe_allow_html=True) 
-
-            st.markdown(f'El Clúster en la fase de definición (morado) tiene las siguientes características:', unsafe_allow_html=True)
-
-            st.markdown(
-                f'- <span style="color:#51C622">Valores medios en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Dispersión amplia en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Variaciión en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios en transición, con niveles moderados de actividad financiera y desarrollo variable en servicios digitales.</b></span>', unsafe_allow_html=True) 
-
-
-
-            st.markdown(f'El Clúster en la fase de optimización (verde) tiene las siguientes características:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Alto en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Medio/alto en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios urbanos y semi-urbanos altamente desarrollados con buena infraestructura digital y alto nivel de actividad financiera.</b></span>', unsafe_allow_html=True)
-
-        st.plotly_chart(grafico2d3, use_container_width=True, height=250)
-
-# El diagrama de caja
-with tab4:
-    st.markdown("¿Qué patrones se encuentran en cada clúster?")
+    # Usar solo las columnas necesarias
+    cols_needed = ['Lugar', 'Madurez', 'Latitud', 'Longitud']
+    if not all(col in df.columns for col in cols_needed):
+        return None  # Salir si faltan columnas
+        
+    plot_data = df[cols_needed].copy()
     
-    with st.expander('Recuento por nivel de madurez', expanded=False):
-        # Crear las columnas
-        col1, col2 = st.columns(2)
-        
-        # Columna 1: Recuento por nivel de madurez
-        with col1:
-            st.markdown("""
-            <div class="madurez-card">
-                <br>
-                <br>                
-                <p><span class="madurez-count">Optimización:</span> <b style="color:#51C622">647</b> municipios</p>
-                <p><span class="madurez-count">Definición:</span> <b style="color:#51C622">551</b> municipios</p>
-                <p><span class="madurez-count">En desarrollo:</span> <b style="color:#51C622">627</b> municipios</p>
-                <p><span class="madurez-count">Inicial:</span> <b style="color:#51C622">631</b> municipios</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Columna 2: Gráfico de barras
-        with col2:
-            st.plotly_chart(recuento_clusters, use_container_width=True, height=250)
+    # Asegurarse de que las coordenadas son numéricas
+    plot_data['Latitud'] = pd.to_numeric(plot_data['Latitud'], errors='coerce')
+    plot_data['Longitud'] = pd.to_numeric(plot_data['Longitud'], errors='coerce')
+    
+    # Eliminar filas con coordenadas faltantes
+    plot_data = plot_data.dropna(subset=['Latitud', 'Longitud'])
+    
+    # Convertir Madurez a categoría
+    if 'Madurez' in plot_data.columns:
+        plot_data['Madurez'] = plot_data['Madurez'].astype('category')
+    
+    # Reducir el número de puntos para mejor rendimiento, preservando el lugar seleccionado
+    if len(plot_data) > max_points:
+        lugar_df = None
+        if lugar:
+            lugar_df = plot_data[plot_data['Lugar'] == lugar]
             
-    # Mostrar las gráficas en orden vertical
-    st.plotly_chart(boxplots_clusters, use_container_width=True)
-    st.plotly_chart(histograma_por_clusters, use_container_width=True)
+        resto_df = plot_data[plot_data['Lugar'] != lugar]
+        if len(resto_df) > max_points:
+            # Muestrear estratificado por Madurez
+            muestra_size = max_points - (0 if lugar_df is None else len(lugar_df))
+            resto_muestra = resto_df.groupby('Madurez', group_keys=False).apply(
+                lambda x: x.sample(min(int(muestra_size * len(x) / len(resto_df)), len(x)), random_state=42)
+            )
+            
+            if lugar_df is not None and not lugar_df.empty:
+                plot_data = pd.concat([lugar_df, resto_muestra])
+            else:
+                plot_data = resto_muestra
 
-# La correlacion
-with tab5:
-    st.markdown(Titulo_dinamico, unsafe_allow_html=True)
+    # Crear el mapa con Plotly
+    fig = px.scatter_mapbox(
+        plot_data,
+        lat="Latitud",
+        lon="Longitud",
+        color="Madurez",
+        opacity=0.7,
+        hover_data=["Madurez", "Lugar"],
+        zoom=4,
+        center={"lat": 23.6345, "lon": -102.5528},
+        title="Mapa de Clústers por Madurez Digital en México",
+        color_discrete_map=color_map,
+        size_max=8  # Tamaño máximo de los marcadores
+    )
 
-    with st.expander('Análisis', expanded=False):
-        # st.markdown(f'La población de <span style="color:#C2185B">{variable_seleccionada}</span> seguirá enfrentando cambios radicales. La tasa de crecimiento anual en <span style="color:#C2185B">{}</span> es de <span style="color:#C2185B">{calculos_df.Crecimiento.iloc[0]:,.1f}%</span>.', unsafe_allow_html=True)
-        st.markdown(f'Los diagramas de dispersión permiten visualizar las relaciones lineales y no lineales de las variables.', unsafe_allow_html=True)
-        st.markdown(f'<span style="color:#51C622">Se trata de un primer acercamiento <span style="color:#51C622">donde es importante recordar que una alta correlación no necesariamente implica causalidad.</span>', unsafe_allow_html=True)
-        st.markdown(f'Vale la pena recordar que la R² ajustada se interpreta como el porcentaje de la varianza de la variable dependiente (eje de las Y) que es explicada por la variable independiente (eje de las X).  La R² ajustada es una medida de la bondad de ajuste de un modelo de regresión lineal. Representa el porcentaje de la varianza de la variable dependiente (eje Y) que es explicada por la variable independiente (eje X) después de ajustar el modelo para tener en cuenta el número de predictores en el modelo y el tamaño de la muestra. En otras palabras, la R² ajustada penaliza la inclusión de términos en el modelo que no mejoran significativamente la capacidad predictiva', unsafe_allow_html=True)
-    st.plotly_chart(fig_scatter, use_container_width=True, height=500)
+    # Resaltar lugar seleccionado
+    if lugar:
+        lugar_df = plot_data[plot_data['Lugar'] == lugar]
+        if not lugar_df.empty:
+            # Añadir punto destacado
+            fig.add_trace(
+                go.Scattermapbox(
+                    lat=lugar_df["Latitud"],
+                    lon=lugar_df["Longitud"],
+                    mode='markers',
+                    marker=dict(
+                        size=12,
+                        color='#ffa500',
+                        opacity=1
+                    ),
+                    name=lugar,
+                    text=lugar_df["Lugar"],
+                    hoverinfo='text'
+                )
+            )
 
-# El mapa final
-with tab6:
+    # Configurar estilo y diseño
+    fig.update_layout(
+        mapbox_style="carto-darkmatter",
+        height=600,
+        margin={"r": 0, "t": 50, "l": 0, "b": 0},
+        legend=dict(
+            title="Nivel de Madurez",
+            itemsizing="constant",
+            traceorder="normal"
+        )
+    )
 
-    with st.expander('Análisis', expanded=False):
-        st.markdown(f'La clasificación proporcionada por el aprendizaje automático no supervisado sugiere que <span style="color:#51C622"> la madurez digital de los municipios no es aleatoria, sino que sigue patrones relacionados con factores financieros, socio-económicos y geográficos</span>. Cuando se realizaba el entrenamiento de los modelos y se evaluaban, se revisaron los pesos de cada variable en cada componente principal; donde llama la atención que son estadísticamente relevantes variables geográficas como la latitud, longitud y el número de vecinos cercanos en un radio de 5 km. Sugiriendo que la proximidad geográfica entre los municipios influye en su madurez digital debido a la infraestructura compartida y la movilidad de sus factores productivos.', unsafe_allow_html=True)
-        st.markdown(f'El mapa que se presenta en esta sección hace evidente que existe una <span style="color:#51C622">concentración de municipios con nivel de madurez óptima (color verde) al rededor de zonas metropolitanas y norte del país.</span>', unsafe_allow_html=True)
-        st.markdown(f'Los municipios en desarrollo (color rojo) tienden a concentrarse más en <span style="color:#51C622">la región central y sur del país.</span>', unsafe_allow_html=True)
-        st.markdown(f'Se puede ver una concentración significativa de municipios en fase de definición (color violeta) en la <span style="color:#51C622">península de Yucatán, formando un clúster definitivo</span>.', unsafe_allow_html=True)
-        st.markdown(f'Los municipios en fase de definición (color violeta) se pueden ver en zonas periféricas a grandes centros urbanos <span style="color:#51C622">lo que sugiere un efecto de desbordamiento digital de los municipios más desarrollados a los menos desarrollados.</span> En general, esta fase sugiere que los municipios ya tienen una infraestructura digital básica y están formalizando sus procesos digitales.', unsafe_allow_html=True)
-        st.markdown(f'Existen clústers claros en el nivel de madurez inicial (color azul turquesa)', unsafe_allow_html=True)
-        st.markdown(f'Es posible observar <span style="color:#51C622">islas de desarrollo avanzado, correspondientes a centros urbanos importantes, rodeadas de zonas menos desarrolladas.</span>', unsafe_allow_html=True)
-        st.markdown(f'Las disparidades regionales son evidentes y podrían requerir de <span style="color:#51C622">estrategias específicas para el despliegue de ofertas comerciales específicas o para el desarrollo digital de los municipios.</span>', unsafe_allow_html=True)
-        st.markdown(f'En resumen, <span style="color:#51C622">existen zonas propicias para la comercialización de servicios digitales porque cuentan con infraestructura funcional y población familiarizada o con capacidad de utilizar los servicios digitales</span>, tales como: El corredor fronterizo del norte, la zona metropolitana del Valle de México, Guadalajara y su área de influencia, Monterrey y municipios circundantes.', unsafe_allow_html=True)
-        st.markdown(f'Si quieres conocer más insights o realizar un análisis específico, [escríbeme](mailto:rodrigo.guarneros@gmail.com), con gusto te ayudo.', unsafe_allow_html=True)
-    st.plotly_chart(fig_map_final, use_container_width=True, height=500)
+    return fig
+
+
+
+
+# 5. Optimizar recuento de clústers (continuación)
+@st.cache_data
+def recuento(df):
+    """
+    Versión optimizada del recuento de clústers
+    """
+    # Mapa de colores predefinido
+    color_map = {
+        'En desarrollo': '#D20103',
+        'Inicial': '#5DE2E7',
+        'Definición': '#CC6CE7',
+        'Optimización': '#51C622',
+    }
+    
+    # Verificar la presencia de la columna 'Madurez'
+    if 'Madurez' not in df.columns:
+        return None
+    
+    # Contar registros por nivel de madurez de manera eficiente
+    total_municipios = len(df)
+    counts = df['Madurez'].value_counts().reset_index()
+    counts.columns = ['Madurez', 'Cantidad']
+    
+    # Calcular frecuencia relativa
+    counts['Frecuencia relativa'] = counts['Cantidad'] / total_municipios
+    
+    # Orden personalizado para las categorías
+    category_order = ['Inicial', 'En desarrollo', 'Definición', 'Optimización']
+    counts['Madurez'] = pd.Categorical(counts['Madurez'], categories=category_order, ordered=True)
+    counts = counts.sort_values('Madurez')
+    
+    # Crear gráfico de barras optimizado
+    fig = px.bar(
+        counts, 
+        x='Madurez', 
+        y='Frecuencia relativa', 
+        title="Frecuencia relativa por nivel de madurez",
+        labels={
+            'Frecuencia relativa': 'Frecuencia relativa', 
+            'Madurez': 'Nivel de madurez'
+        },
+        color='Madurez', 
+        color_discrete_map=color_map,
+        height=280
+    )
+    
+    # Añadir etiquetas de valores
+    fig.update_traces(
+        texttemplate='%{y:.1%}',
+        textposition='outside',
+        marker_line_color='white',
+        marker_line_width=1,
+        opacity=0.85
+    )
+    
+    # Optimizar diseño
+    fig.update_layout(
+        xaxis=dict(
+            title=dict(text="Nivel de madurez", font=dict(color="white")),
+            tickfont=dict(color="white")
+        ),
+        yaxis=dict(
+            title=dict(text="Frecuencia relativa", font=dict(color="white")),
+            tickformat='.1%',  # Formato de porcentaje
+            tickfont=dict(color="white"),
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.1)'
+        ),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=10, r=10, t=50, b=30)
+    )
+    
+    return fig
+
+
+
+
+
+# Optimización 6: Mejorar la interfaz de usuario y carga inicial
+
+# 1. Optimizar la carga inicial de la aplicación
+def optimizar_carga_inicial():
+    """
+    Muestra un spinner mientras se cargan los datos principales
+    """
+    with st.spinner('Cargando datos municipales...'):
+        # Establecer una sola conexión a MongoDB
+        cliente_mongo = get_mongodb_connection()
+        
+        # Mostrar progreso de carga
+        progress_bar = st.progress(0)
+        
+        # Cargar datos geográficos (10%)
+        geojson = obtener_datos_geograficos()
+        progress_bar.progress(10)
+        
+        # Cargar datos principales (40%)
+        datos = bajando_procesando_datos()
+        progress_bar.progress(40)
+        
+        # Procesar variables numéricas y categóricas (50%)
+        variable_list_numerica, variable_list_categoricala, variable_list_municipio = procesar_listas_variables(datos)
+        progress_bar.progress(50)
+        
+        # Cargar dataset completo (70%)
+        dataset_complete = bajando_procesando_datos_completos()
+        progress_bar.progress(70)
+        
+        # Cargar datos de normalización (90%)
+        df = bajando_procesando_X_entrenamiento()
+        df_normalizado = bajando_procesando_df_normalizado()
+        progress_bar.progress(90)
+        
+        # Preparar datos para visualización (100%)
+        dataset_complete_geometry = preparar_datos_para_visualizacion(datos, geojson)
+        progress_bar.progress(100)
+        
+        # Eliminar la barra de progreso
+        progress_bar.empty()
+        
+        return datos, dataset_complete, df, df_normalizado, geojson, dataset_complete_geometry, variable_list_numerica, variable_list_categoricala, variable_list_municipio
+
+# 2. Optimizar procesamiento de listas de variables
+@st.cache_data
+def procesar_listas_variables(input_datos):
+    """
+    Procesa y filtra listas de variables de manera eficiente
+    """
+    # Procesar variables numéricas
+    variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
+    
+    # Procesar variables categóricas
+    variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
+    
+    # Lista de municipios
+    variable_list_municipio = list(input_datos['Lugar'].unique())
+    
+    # Columnas para excluir
+    columns_to_exclude_numeric = [
+        'Cluster2', 'Unnamed: 0', 'Unnamed: 0.2', 'cve_edo', 'cve_municipio', 
+        'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 
+        'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 
+        'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 
+        'df4_Clave Municipio'
+    ]
+    
+    columns_to_exclude_categorical = [
+        '_id', 'Lugar', 'Estado2', 'df2_Región', 'df3_Región', 
+        'df3_Tipo de población', 'df4_Región', 'Municipio'
+    ]
+    
+    # Filtrar variables
+    variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
+    variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
+    
+    return variable_list_numeric, variable_list_categorical, variable_list_municipio
+
+# 3. Optimizar títulos dinámicos
+@st.cache_data
+def titulo_dinamico(variable, tipo="variable"):
+    """
+    Genera títulos dinámicos optimizados
+    """
+    if tipo == "variable":
+        return f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">La variable mostrada es: "{variable}".</span>'
+    elif tipo == "municipio":
+        return f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">Municipio de "{variable}".</span>'
+    elif tipo == "madurez":
+        return f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">Análisis de Madurez Digital de "{variable}".</span>'
+    else:
+        return f'<span style="color: #FFD86C; font-size: 30px; font-weight: bold;">{variable}</span>'
+
+# 4. Optimizar carga de gráficos para cada pestaña
+def cargar_graficos_tab1(variable_seleccionada_municipio, datos, dataset_complete_geometry):
+    """
+    Carga solo los gráficos necesarios para la pestaña 1
+    """
+    # La pestaña 1 es principalmente texto, no hay gráficos pesados para cargar
+    pass
+
+def cargar_graficos_tab2(variable_seleccionada_municipio, variable_seleccionada_numerica, datos, dataset_complete_geometry):
+    """
+    Carga solo los gráficos necesarios para la pestaña 2
+    """
+    with st.spinner('Generando visualizaciones del municipio...'):
+        progress_bar = st.progress(0)
+        
+        # Cargar mapa choropleth (25%)
+        fig_municipio = crear_mapa_choropleth2(dataset_complete_geometry, lugar=variable_seleccionada_municipio)
+        progress_bar.progress(25)
+        
+        # Cargar gráfico de barras (50%)
+        fig_ranking = plot_bar_chart(datos, 'Lugar', 'Índice_Compuesto', variable_seleccionada_municipio)
+        progress_bar.progress(50)
+        
+        # Cargar cuadro resumen (60%)
+        cuadro_resumen = crear_display(datos, variable_seleccionada_municipio)
+        progress_bar.progress(60)
+        
+        # Cargar histograma (80%)
+        fig_hist = plot_histogram(datos, variable_seleccionada_numerica, 'Madurez')
+        progress_bar.progress(80)
+        
+        # Cargar histograma de índice (90%)
+        fig_hist_index = plot_histogram_with_density(datos, 'Índice_Compuesto', variable_seleccionada_municipio)
+        progress_bar.progress(90)
+        
+        # Cargar boxplot (100%)
+        fig_boxplot = generate_boxplot_with_annotations(datos, variable_seleccionada_numerica, variable_seleccionada_municipio)
+        progress_bar.progress(100)
+        
+        # Eliminar la barra de progreso
+        progress_bar.empty()
+        
+        return fig_municipio, fig_ranking, cuadro_resumen, fig_hist, fig_hist_index, fig_boxplot
+
+def cargar_graficos_tab3(variable_seleccionada_municipio, datos, df_normalizado, dataset_complete):
+    """
+    Carga solo los gráficos necesarios para la pestaña 3
+    """
+    with st.spinner('Generando visualizaciones 3D y PCA...'):
+        progress_bar = st.progress(0)
+        
+        # Cargar gráfico 3D (50%)
+        grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete, variable_seleccionada_municipio)
+        progress_bar.progress(50)
+        
+        # Cargar gráficos 2D (100%)
+        graficos_2d = generar_todos_graficos_2d(datos, df_normalizado, dataset_complete, variable_seleccionada_municipio)
+        progress_bar.progress(100)
+        
+        # Eliminar la barra de progreso
+        progress_bar.empty()
+        
+        return grafico3d, graficos_2d
+
+def cargar_graficos_tab4(variable_seleccionada_numerica, datos):
+    """
+    Carga solo los gráficos necesarios para la pestaña 4
+    """
+    with st.spinner('Generando análisis estadísticos por grupo...'):
+        progress_bar = st.progress(0)
+        
+        # Cargar recuento de clústers (30%)
+        recuento_clusters = recuento(datos)
+        progress_bar.progress(30)
+        
+        # Cargar boxplot por clústers (60%)
+        boxplots_clusters = boxplot_por_cluster(datos, variable_seleccionada_numerica)
+        progress_bar.progress(60)
+        
+        # Cargar histograma por clústers (100%)
+        histograma_por_clusters = plot_histogram_clusters(datos, variable_seleccionada_numerica)
+        progress_bar.progress(100)
+        
+        # Eliminar la barra de progreso
+        progress_bar.empty()
+        
+        return recuento_clusters, boxplots_clusters, histograma_por_clusters
+
+def cargar_graficos_tab5(variable_seleccionada_numerica, variable_seleccionada_paracorrelacion, variable_seleccionada_categorica, datos):
+    """
+    Carga solo los gráficos necesarios para la pestaña 5
+    """
+    with st.spinner('Generando análisis correlacional...'):
+        # Cargar scatter plot con regresión
+        fig_scatter = generate_scatter_with_annotations(
+            datos, 
+            variable_seleccionada_numerica, 
+            variable_seleccionada_paracorrelacion, 
+            variable_seleccionada_categorica
+        )
+        return fig_scatter
+
+def cargar_graficos_tab6(variable_seleccionada_municipio, datos):
+    """
+    Carga solo los gráficos necesarios para la pestaña 6
+    """
+    with st.spinner('Generando mapa geográfico...'):
+        # Cargar mapa con lugar
+        fig_map_final = generar_mapa_con_lugar(datos, lugar=variable_seleccionada_municipio)
+        return fig_map_final
+
+# 5. Mejora general de la interfaz de usuario
+def optimizar_interfaz():
+    """
+    Aplicar mejoras generales a la interfaz de usuario
+    """
+    # Reducir el CSS a lo esencial
+    st.markdown("""
+    <style>
+    [data-testid="block-container"] {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: -10rem;
+        padding-bottom: 0rem;
+        margin-bottom: -7rem;
+    }
+    [data-testid="stMetric"] {
+        background-color: #393939;
+        text-align: center;
+        padding: 10px 0;
+    }
+    [data-testid="stMetricLabel"] {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Configuración de la página optimizada
+    st.set_page_config(
+        page_title="Aprendizaje Automático para los Municipios de México",
+        page_icon="📱",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Habilitar tema oscuro para Altair
+    alt.themes.enable("dark")
+
+
+
+# Optimización 7: Implementar carga lazy y mejoras en el manejo de memoria
+
+# 1. Implementar SessionState para Streamlit
+class SessionState:
+    """
+    Clase para mantener estado entre recargas de Streamlit
+    """
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+def get_session_state(**kwargs):
+    """
+    Obtiene o crea un SessionState
+    """
+    # Verificar si ya existe un estado en la sesión
+    session_state = st.session_state
+    
+    # Actualizar con los valores proporcionados
+    for key, val in kwargs.items():
+        if key not in session_state:
+            session_state[key] = val
+    
+    return session_state
+
+# 2. Implementar carga lazy para datos pesados
+def lazy_load(key, loader_func, *args, **kwargs):
+    """
+    Carga un recurso solo cuando se necesita y lo almacena en session_state
+    
+    Args:
+        key: Clave para almacenar en session_state
+        loader_func: Función para cargar el recurso
+        args, kwargs: Argumentos para loader_func
+    
+    Returns:
+        El recurso cargado
+    """
+    session_state = get_session_state()
+    
+    # Verificar si el recurso ya está cargado
+    if key not in session_state:
+        # Cargar el recurso y almacenarlo
+        session_state[key] = loader_func(*args, **kwargs)
+    
+    return session_state[key]
+
+# 3. Implementar limpieza de memoria para recursos no utilizados
+def cleanup_unused_resources(active_tab):
+    """
+    Libera recursos que no se están utilizando en la pestaña actual
+    
+    Args:
+        active_tab: Índice de la pestaña activa
+    """
+    session_state = get_session_state()
+    
+    # Mapeo de recursos por pestaña
+    tab_resources = {
+        0: [],  # Tab 1: No tiene recursos pesados
+        1: ['fig_municipio', 'fig_ranking', 'cuadro_resumen', 'fig_hist', 'fig_hist_index', 'fig_boxplot'],
+        2: ['grafico3d', 'grafico2d1', 'grafico2d2', 'grafico2d3'],
+        3: ['recuento_clusters', 'boxplots_clusters', 'histograma_por_clusters'],
+        4: ['fig_scatter'],
+        5: ['fig_map_final']
+    }
+    
+    # Recursos compartidos que no deben limpiarse
+    shared_resources = ['datos', 'dataset_complete', 'df', 'df_normalizado', 'geojson', 'dataset_complete_geometry']
+    
+    # Obtener recursos activos para la pestaña actual
+    active_resources = tab_resources.get(active_tab, []) + shared_resources
+    
+    # Obtener todos los recursos de todas las pestañas
+    all_tab_resources = []
+    for resources in tab_resources.values():
+        all_tab_resources.extend(resources)
+    
+    # Liberar recursos no utilizados
+    for key in list(session_state.keys()):
+        if key in all_tab_resources and key not in active_resources:
+            # Solo limpiar recursos gráficos, no datos base
+            if key not in shared_resources:
+                del session_state[key]
+
+# 4. Implementar gestión de memoria para DataFrame grandes
+def optimize_dataframe(df):
+    """
+    Optimiza un DataFrame para reducir uso de memoria
+    
+    Args:
+        df: DataFrame a optimizar
+    
+    Returns:
+        DataFrame optimizado
+    """
+    # Si no es un DataFrame, devolver tal cual
+    if not isinstance(df, pd.DataFrame):
+        return df
+    
+    # Hacer una copia para no modificar el original
+    result = df.copy()
+    
+    # Optimizar tipos numéricos
+    for col in result.select_dtypes(include=['int']).columns:
+        # Determinar el rango de valores
+        col_min, col_max = result[col].min(), result[col].max()
+        
+        # Elegir el tipo más pequeño que pueda contener los valores
+        if col_min >= 0:
+            if col_max < 2**8:
+                result[col] = result[col].astype(np.uint8)
+            elif col_max < 2**16:
+                result[col] = result[col].astype(np.uint16)
+            elif col_max < 2**32:
+                result[col] = result[col].astype(np.uint32)
+        else:
+            if col_min > -2**7 and col_max < 2**7:
+                result[col] = result[col].astype(np.int8)
+            elif col_min > -2**15 and col_max < 2**15:
+                result[col] = result[col].astype(np.int16)
+            elif col_min > -2**31 and col_max < 2**31:
+                result[col] = result[col].astype(np.int32)
+    
+    # Optimizar tipos float
+    for col in result.select_dtypes(include=['float']).columns:
+        # Convertir a float32 si es posible
+        result[col] = result[col].astype(np.float32)
+    
+    # Optimizar tipos categóricos
+    for col in result.select_dtypes(include=['object']).columns:
+        # Verificar si la columna tiene pocos valores únicos
+        if result[col].nunique() < len(result) * 0.5:  # Menos del 50% de valores únicos
+            result[col] = result[col].astype('category')
+    
+    return result
+
+# 5. Implementar carga por bloques para datos muy grandes
+def load_in_chunks(collection, query=None, projection=None, chunk_size=1000):
+    """
+    Carga datos de MongoDB en bloques para reducir uso de memoria
+    
+    Args:
+        collection: Colección de MongoDB
+        query: Consulta para filtrar documentos
+        projection: Proyección para seleccionar campos
+        chunk_size: Tamaño de cada bloque
+    
+    Returns:
+        DataFrame con todos los datos
+    """
+    # Preparar consulta y proyección
+    query = {} if query is None else query
+    projection = None if projection is None else projection
+    
+    # Obtener cursor
+    cursor = collection.find(query, projection)
+    
+    # Inicializar lista para almacenar chunks
+    chunks = []
+    
+    # Cargar documentos por bloques
+    while True:
+        # Obtener siguiente bloque
+        chunk = list(cursor.limit(chunk_size).skip(len(chunks) * chunk_size))
+        
+        # Si no hay más documentos, salir del bucle
+        if not chunk:
+            break
+        
+        # Convertir ObjectId a str en cada documento
+        chunk = list(map(convert_objectid_to_str, chunk))
+        
+        # Añadir bloque a la lista
+        chunks.append(pd.DataFrame(chunk))
+    
+    # Concatenar todos los bloques
+    if chunks:
+        return pd.concat(chunks, ignore_index=True)
+    else:
+        return pd.DataFrame()
+
+# 6. Implementar un sistema de cache con límite de tamaño
+class LRUCache:
+    """
+    Cache LRU (Least Recently Used) con límite de tamaño
+    """
+    def __init__(self, max_size=10):
+        self.cache = {}
+        self.max_size = max_size
+        self.order = []
+    
+    def get(self, key):
+        """
+        Obtiene un valor del cache
+        
+        Args:
+            key: Clave a buscar
+        
+        Returns:
+            Valor asociado a la clave o None si no existe
+        """
+        if key in self.cache:
+            # Actualizar orden
+            self.order.remove(key)
+            self.order.append(key)
+            return self.cache[key]
+        return None
+    
+    def put(self, key, value):
+        """
+        Añade un valor al cache
+        
+        Args:
+            key: Clave
+            value: Valor a almacenar
+        """
+        # Si la clave ya existe, actualizar orden
+        if key in self.cache:
+            self.order.remove(key)
+        
+        # Si el cache está lleno, eliminar el elemento menos usado
+        elif len(self.cache) >= self.max_size:
+            oldest_key = self.order.pop(0)
+            del self.cache[oldest_key]
+        
+        # Añadir nueva clave-valor
+        self.cache[key] = value
+        self.order.append(key)
+    
+    def clear(self):
+        """
+        Limpia el cache
+        """
+        self.cache = {}
+        self.order = []
+
+# 7. Implementar un sistema de prefetch para pestañas adyacentes
+def prefetch_tab_data(current_tab, datos, dataset_complete, df, df_normalizado, 
+                      dataset_complete_geometry, variable_seleccionada_municipio,
+                      variable_seleccionada_numerica, variable_seleccionada_paracorrelacion,
+                      variable_seleccionada_categorica):
+    """
+    Precarga datos para pestañas adyacentes en segundo plano
+    
+    Args:
+        current_tab: Índice de la pestaña actual
+        ... otros parámetros necesarios para cargar datos
+    """
+    session_state = get_session_state()
+    
+    # Determinar pestañas adyacentes (actual +/- 1)
+    adjacent_tabs = [
+        t for t in [current_tab - 1, current_tab + 1] 
+        if 0 <= t <= 5  # Solo pestañas válidas
+    ]
+    
+    # Función para cargar datos de una pestaña en segundo plano
+    def load_tab_data(tab_index):
+        if tab_index == 1 and not all(k in session_state for k in ['fig_municipio', 'fig_ranking']):
+            # Precargar solo los gráficos principales de la pestaña 2
+            fig_municipio = crear_mapa_choropleth2(dataset_complete_geometry, lugar=variable_seleccionada_municipio)
+            fig_ranking = plot_bar_chart(datos, 'Lugar', 'Índice_Compuesto', variable_seleccionada_municipio)
+            
+            session_state['fig_municipio'] = fig_municipio
+            session_state['fig_ranking'] = fig_ranking
+        
+        elif tab_index == 2 and 'grafico3d' not in session_state:
+            # Precargar solo el gráfico 3D de la pestaña 3
+            grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete, variable_seleccionada_municipio)
+            session_state['grafico3d'] = grafico3d
+        
+        elif tab_index == 3 and 'recuento_clusters' not in session_state:
+            # Precargar recuento de clústers de la pestaña 4
+            recuento_clusters = recuento(datos)
+            session_state['recuento_clusters'] = recuento_clusters
+        
+        elif tab_index == 4 and 'fig_scatter' not in session_state:
+            # Precargar scatter plot de la pestaña 5
+            fig_scatter = generate_scatter_with_annotations(
+                datos, 
+                variable_seleccionada_numerica, 
+                variable_seleccionada_paracorrelacion, 
+                variable_seleccionada_categorica
+            )
+            session_state['fig_scatter'] = fig_scatter
+    
+    # Usar ThreadPoolExecutor para cargar en segundo plano
+    with ThreadPoolExecutor(max_workers=len(adjacent_tabs)) as executor:
+        for tab in adjacent_tabs:
+            executor.submit(load_tab_data, tab)
+
+
+
+
+
+
+# Estructura principal optimizada de la aplicación (continuación)
+
+def main():
+    try:
+        # Establecer configuración de página
+        optimizar_interfaz()
+        
+        # Inicializar estado de sesión
+        session_state = get_session_state(
+            contador_visitas=0,
+            active_tab=0,
+            data_loaded=False
+        )
+        
+        # Sidebar
+        with st.sidebar:
+            # Logo e información del proyecto
+            st.markdown("""
+            <h5 style='text-align: center;'> 
+                Centro de Investigación e Innovación en TICs (INFOTEC)
+                <hr>
+                Aplicación elaborada por <br><br>
+                <a href='https://www.linkedin.com/in/guarneros' style='color: #51C622; text-decoration: none;'>Rodrigo Guarneros Gutiérrez</a>        
+                <br><br> 
+                Para obtener el grado de Maestro en Ciencia de Datos e Información.
+                <hr> 
+                Asesor: <a href='https://www.infotec.mx/es_mx/Infotec/mario-graff-guerrero' style='color: #51C622; text-decoration: none;'> Ph.D. Mario Graff Guerrero </a>
+            </h5>
+            """, unsafe_allow_html=True)
+
+            st.sidebar.image("fuentes/nube.png", use_column_width=True)
+            st.markdown("<hr>", unsafe_allow_html=True)
+            
+            # Cargar datos principales si aún no están cargados
+            if not session_state.data_loaded:
+                with st.spinner("Cargando datos iniciales..."):
+                    # Incrementar contador de visitas una sola vez
+                    session_state.contador_visitas = lazy_load(
+                        'contador_visitas', 
+                        incrementar_contador_visitas
+                    )
+                    
+                    # Cargar datasets básicos
+                    datos = lazy_load('datos', bajando_procesando_datos)
+                    datos = optimize_dataframe(datos)  # Optimizar uso de memoria
+                    
+                    # Procesar variables
+                    variable_list_numeric, variable_list_categorical, variable_list_municipio = lazy_load(
+                        'variable_lists',
+                        procesar_listas_variables,
+                        datos
+                    )
+                    
+                    session_state.data_loaded = True
+            else:
+                # Recuperar datos ya cargados
+                datos = session_state.datos
+                variable_list_numeric = session_state.variable_lists[0]
+                variable_list_categorical = session_state.variable_lists[1]
+                variable_list_municipio = session_state.variable_lists[2]
+            
+            # Selectores
+            st.markdown("Principales características por Municipio:", unsafe_allow_html=True)
+            variable_seleccionada_municipio = st.selectbox(
+                'Selecciona el municipio de tu interés:', 
+                sorted(variable_list_municipio, reverse=False),
+                key='municipio_selector'
+            )
+
+            st.markdown("<hr>", unsafe_allow_html=True)
+            
+            st.markdown("Análisis Estadístico por Variable:", unsafe_allow_html=True)
+            variable_seleccionada_numerica = st.selectbox(
+                'Selecciona la variable numérica de interés:', 
+                sorted(variable_list_numeric, reverse=False),
+                key='variable_numerica_selector'
+            )
+            
+            variable_seleccionada_categorica = st.selectbox(
+                'Selecciona la variable categórica de interés:', 
+                sorted(variable_list_categorical, reverse=False),
+                key='variable_categorica_selector'
+            )
+            
+            variable_seleccionada_paracorrelacion = st.selectbox(
+                'Selecciona la variable que quieras correlacionar con la primera selección:', 
+                sorted(variable_list_numeric, reverse=False),
+                key='variable_correlacion_selector'
+            )
+
+            st.markdown("<hr>", unsafe_allow_html=True)
+
+            # Expanders con información
+            with st.expander('Enfoque de esta aplicación', expanded=False):
+                st.write('''
+                    - Se basa en un enfoque de <span style="color:#51C622">"Programación Orientada a Objetos"</span>.
+                    - Los 2,456 municipios se pueden modelar a partir de sus atributos y funciones para aprovechar la revolución digital. 
+                    - El principal objetivo es: <span style="color:#51C622">Ajustar un modelo de aprendizaje automático para clasificar a las localidades de México por su vocación para la transformación digital y despliegue de servicios TIC, en función de variables fundamentales de infraestructura, demográficas y socio-económicas.</span>
+                    - Este aplicativo incluye atributos a nivel municipal tales como:
+                        1. Número de viviendas. 
+                        2. Grado educativo (Analfabetismo, Porcentaje de personas con educación básica, etc.).
+                        3. Edad promedio, 
+                        4. Penetración de Internet, entre otas.
+                    - Con base en estas características, se pueden generar diferentes combinaciones y visualizaciones de interés para conocer mejor aspectos como:
+                        1. La distribución estadística de las variables. 
+                        2. Relación entre las variables. 
+                        3. La distribución geográfica de las variables.
+                    - La ventaja de un panel de control como este consiste en sus <span style="color:#51C622">economías de escala y la capacidad que tiene para presentar insights más profundos respecto a la población y sus funciones o actividades, tales como capacidad adquisitiva, preferencias, crédito al consumo, acceso a servicios de conectividad, empleo, sequías y hasta modelos predictivos.</span> 
+                    ''', unsafe_allow_html=True)
+
+            with st.expander('Fuentes y detalles técnicos', expanded=False):
+                st.write('''
+                    - Fuente: [Consejo Nacional de Población (CONAPO), consultado el 3 de febrero de 2024.](https://www.gob.mx/conapo).
+                    - Tecnologías y lenguajes: Python 3.10, Streamlit 1.30.0, CSS 3.0, HTML5, Google Colab y GitHub. 
+                    - Autor: Rodrigo Guarneros ([LinkedIn](https://www.linkedin.com/in/guarneros/) y [X](https://twitter.com/RodGuarneros)).
+                    - Comentarios al correo electrónico rodrigo.guarneros@gmail.com
+                    ''', unsafe_allow_html=True)
+
+            st.image('fuentes/cc.png', caption= '\u00A9 Copy Rights Rodrigo Guarneros, 2024', use_column_width=True)
+            st.markdown("Esta aplicación web se rige por los derechos de propiedad de [Creative Commons CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Si quieres hacer algunos ajustes o adaptar esta aplicación te puedo ayudar, [escríbeme](rodrigo.guarneros@gmail.com).", unsafe_allow_html=True)
+            st.markdown(f"Visitas al sitio: **{session_state.contador_visitas}**", unsafe_allow_html=True)
+
+        # Cargar datos adicionales solo cuando se necesiten
+        def load_additional_data():
+            with st.spinner("Cargando datos adicionales..."):
+                # Cargar datasets adicionales
+                dataset_complete = lazy_load('dataset_complete', bajando_procesando_datos_completos)
+                dataset_complete = optimize_dataframe(dataset_complete)  # Optimizar uso de memoria
+                
+                df = lazy_load('df', bajando_procesando_X_entrenamiento)
+                df = optimize_dataframe(df)  # Optimizar uso de memoria
+                
+                df_normalizado = lazy_load('df_normalizado', bajando_procesando_df_normalizado)
+                df_normalizado = optimize_dataframe(df_normalizado)  # Optimizar uso de memoria
+                
+                # Cargar datos geográficos
+                geojson = lazy_load('geojson', obtener_datos_geograficos)
+                
+                # Preparar datos para visualización
+                dataset_complete_geometry = lazy_load(
+                    'dataset_complete_geometry',
+                    preparar_datos_para_visualizacion,
+                    datos, geojson
+                )
+                
+                return dataset_complete, df, df_normalizado, geojson, dataset_complete_geometry
+        
+        # Definir las pestañas
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "Presentación", "Municipio", "Madurez Digital", 
+            "Estadísiticas por Grupo", "Análisis Relacional", "Geografía"
+        ])
+        
+        # Detectar la pestaña activa
+        # Nota: Esto es una aproximación ya que Streamlit no tiene una API directa
+        # para detectar la pestaña seleccionada actualmente
+        if 'tab_clicked' not in session_state:
+            session_state.tab_clicked = 0  # Pestaña 1 por defecto
+            
+        # Definir funciones para cada pestaña
+        def render_tab1():
+            with tab1:
+                # La pestaña 1 es principalmente texto, carga rápida
+                with st.expander('¿Para qué sirve esta aplicación?', expanded=False):
+                    st.markdown(f'Provee un punto de referencia estadísticamente robusto, claro y preciso —con un criterio basado en aprendizaje automático y poder computacional, sin intervención humana, solo considerando las principales características de los municipios—, para efectos de que puedas ver dónde está cada municipio de México en su trayectoria hacia la <span style="color:#51C622">"Madurez Digital"</span> y qué características debe considerar para favorecer su transición a la siguiente fase del ciclo de transformación digital.', unsafe_allow_html=True)
+                    # ... (resto del contenido de este expander)
+                
+                with st.expander('¿Qué es la madurez digital?', expanded=False):
+                    st.markdown(f'En la inteligencia de negocios existen modelos de maduración para las organizaciones y empresas con el objeto de evaluar la toma decisiones basada en datos (Gartner 2004, AMR Research, Service Oriented Business Intelligence Maturirty Model (SOBIMM), entre otros descritos por <a href="https://aulavirtual.infotec.mx/pluginfile.php/115302/mod_label/intro/Medici%C3%B3n%20de%20Madurez%20en%20la%20Implementaci%C3%B3n%20de%20Inteligencia%20de%20Negocios.pdf" target="_blank"><b>Urbina Nájera y Medina-Barrera (2021)</b></a>), la Unión Europea desarrolló la metodología para evaluar la madurez digital de los gobiernos locales (<a href="https://data.europa.eu/en/news-events/news/lordimas-digital-maturity-assessment-tool-regions-and-cities" target="_blank"><b>LORDIMAS 2023, Digital Maturity Index for local governments</b></a>), no existe un enfoque único para evaluar la madurez digital de las regiones o localidades donde el ciudadano sea el objeto de estudio. No obstante, algunos países reconocen el papel de los servicios digitales y financieros como elementos fundamentales para hacer negocios y generar bienestar en una región. Por ello, han definido en sus estándares de desarrollo una canasta básica de bienes y servicios digitales.', unsafe_allow_html=True)
+                    # ... (imagen y resto del contenido)
+                
+                with st.expander('¿Cómo utilizar esta aplicación?', expanded=False):
+                    st.markdown(f'Como se puede ver, se cuenta con 5 secciones adicionales:', unsafe_allow_html=True)
+                    # ... (resto del contenido)
+                
+                # Actualizar pestaña activa
+                session_state.active_tab = 0
+        
+        def render_tab2():
+            with tab2:
+                # Cargar datos adicionales si es necesario
+                dataset_complete, df, df_normalizado, geojson, dataset_complete_geometry = load_additional_data()
+                
+                # Título dinámico
+                st.markdown(titulo_dinamico(variable_seleccionada_municipio, tipo="municipio"), unsafe_allow_html=True)
+                
+                # Expander con descripción
+                with st.expander('Descripción', expanded=False):
+                    st.markdown(f'Esta sección incluye cuatro visualizaciones relevantes para conocer mejor al municipio seleccionado y el lugar que tiene en la clasificación realizada por nuestra máquina de inferencia estadística. Se sugiere analizar en el siguiente orden:', unsafe_allow_html=True)
+                    # ... (resto del contenido descriptivo)
+                
+                # Cargar gráficos solo si no están en session_state
+                if not all(k in session_state for k in ['fig_municipio', 'fig_ranking', 'cuadro_resumen']):
+                    with st.spinner("Generando visualizaciones..."):
+                        # Generar los gráficos necesarios para esta pestaña
+                        session_state.fig_municipio = crear_mapa_choropleth2(
+                            dataset_complete_geometry, 
+                            lugar=variable_seleccionada_municipio
+                        )
+                        
+                        session_state.fig_ranking = plot_bar_chart(
+                            datos, 
+                            'Lugar', 
+                            'Índice_Compuesto', 
+                            variable_seleccionada_municipio
+                        )
+                        
+                        session_state.cuadro_resumen = crear_display(
+                            datos, 
+                            variable_seleccionada_municipio
+                        )
+                
+                # Cargar histogramas y boxplot bajo demanda
+                if not all(k in session_state for k in ['fig_hist', 'fig_hist_index', 'fig_boxplot']):
+                    with st.spinner("Generando visualizaciones estadísticas..."):
+                        session_state.fig_hist = plot_histogram(
+                            datos, 
+                            variable_seleccionada_numerica, 
+                            variable_seleccionada_categorica
+                        )
+                        
+                        session_state.fig_hist_index = plot_histogram_with_density(
+                            datos, 
+                            'Índice_Compuesto', 
+                            variable_seleccionada_municipio
+                        )
+                        
+                        session_state.fig_boxplot = generate_boxplot_with_annotations(
+                            datos, 
+                            variable_seleccionada_numerica, 
+                            variable_seleccionada_municipio
+                        )
+                
+                # Crear dos columnas principales
+                col_izq, col_der = st.columns([6, 6])
+                
+                # Columna izquierda: solo el ranking
+                with col_izq:
+                    st.plotly_chart(session_state.fig_ranking, width=400, use_container_width=True)
+                
+                # Columna derecha: mapa y gráficos en secuencia vertical
+                with col_der:
+                    st.plotly_chart(session_state.cuadro_resumen, width=400, use_container_width=True)
+                    # Mapa ajustado al ancho de la columna
+                    folium_static(session_state.fig_municipio, width=455, height=180)
+                    # Análisis expander
+                    with st.expander('Análisis', expanded=False):
+                        st.markdown(f'Esta distribución bimodal sugiere dos grupos diferenciados en términos de madurez digital, una brecha digital significativa entre los municipios:', unsafe_allow_html=True)
+                        # ... (resto del análisis)
+                    
+                    st.plotly_chart(session_state.fig_hist_index, use_container_width=True)
+                    st.plotly_chart(session_state.fig_hist, use_container_width=True)
+                    st.plotly_chart(session_state.fig_boxplot, use_container_width=True)
+                
+                # Actualizar pestaña activa
+                session_state.active_tab = 1
+                
+                # Prefetch para pestañas adyacentes
+                prefetch_tab_data(
+                    1, 
+                    datos, dataset_complete, df, df_normalizado, dataset_complete_geometry,
+                    variable_seleccionada_municipio, variable_seleccionada_numerica,
+                    variable_seleccionada_paracorrelacion, variable_seleccionada_categorica
+                )
+        
+        def render_tab3():
+            with tab3:
+                # Cargar datos adicionales si es necesario
+                dataset_complete, df, df_normalizado, geojson, dataset_complete_geometry = load_additional_data()
+                
+                st.markdown(titulo_dinamico(variable_seleccionada_municipio, tipo="madurez"), unsafe_allow_html=True)
+                st.markdown(
+                    """
+                    <div style="text-align: justify;">
+                        Maximiza la página para visualizar los tres Componentes Principales y sus patrones identificados. Visualiza cómo se complementan entre sí: <br>
+                        - PC1 <span style="color:#51C622; font-weight:bold;">- Actividad financiera (volumen/intensidad);</span> <br>
+                        - PC2 <span style="color:#51C622; font-weight:bold;">- Servicios digitales (infraestructura/acceso), y</span> <br>
+                        - PC3 <span style="color:#51C622; font-weight:bold;">- Adopción financiera (diversificación/inclusión).</span> <br>
+                        Con esta metodología se proporciona una visión muy completa del desarrollo financiero y digital de los municipios.
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+                # Configuración de las columnas
+                col1, col2 = st.columns([1, 1])
+                
+                with col1:
+                    # Cargar gráfico 3D
+                    if 'grafico3d' not in session_state:
+                        with st.spinner("Generando gráfico 3D..."):
+                            session_state.grafico3d = generar_grafico_3d_con_lugar(
+                                datos, df_normalizado, dataset_complete, variable_seleccionada_municipio
+                            )
+                    
+                    # Cargar gráfico 2D
+                    if 'grafico2d1' not in session_state:
+                        with st.spinner("Generando gráficos 2D..."):
+                            session_state.grafico2d1 = generar_grafico_2d(
+                                datos, df_normalizado, dataset_complete, variable_seleccionada_municipio,
+                                x_col='PCA1', y_col='PCA2', title="PC1 vs. PC2 (2D)"
+                            )
+                    
+                    # Expander con explicación
+                    with st.expander('El significado de cada Componente Principal', expanded=False):
+                        st.markdown(f'<span style="color:#51C622">Los componentes principales (PC1, PC2 y PC3) buscan maximizar la suma de las distancias al cuadrado entre los puntos proyectados y el origen</span>. Su resultado es una combinación lineal de todas las variables que los conforman. Así, la descomposición en valores singulares (SVD) nos permite visualizar en la gráfica la proyección de cada una de las combinaciones lineales en los municipios, representados en un espacio vectorial que va de -1 a 1 en cada eje del gráfico tridimensional.', unsafe_allow_html=True)
+                        # ... (resto de la explicación)
+                    
+                    # Mostrar gráfico 3D
+                    st.plotly_chart(session_state.grafico3d, use_container_width=True, height=500)
+                    
+                    with st.expander('Patrones en los clústers', expanded=False):
+                        st.markdown(f'La separación entre clústers tiene mejor visibilidad en tres dimensiones, en general se puede decir que:', unsafe_allow_html=True)
+                        # ... (resto del contenido)
+                    
+                    st.plotly_chart(session_state.grafico2d1, use_container_width=True, height=250)
+                
+                with col2:
+                    # Cargar gráficos 2D adicionales
+                    if 'grafico2d2' not in session_state:
+                        with st.spinner("Generando gráficos 2D adicionales..."):
+                            session_state.grafico2d2 = generar_grafico_2d(
+                                datos, df_normalizado, dataset_complete, variable_seleccionada_municipio,
+                                x_col='PCA1', y_col='PCA3', title="PC1 vs. PC3 (2D)"
+                            )
+                    
+                    if 'grafico2d3' not in session_state:
+                        with st.spinner("Generando último gráfico 2D..."):
+                            session_state.grafico2d3 = generar_grafico_2d(
+                                datos, df_normalizado, dataset_complete, variable_seleccionada_municipio,
+                                x_col='PCA2', y_col='PCA3', title="PC2 vs. PC3 (2D)"
+                            )
+                    
+                    with st.expander('Estructura de los clústers', expanded=False):
+                        st.markdown(f'Esta segmentación, resultado de las similitudes en las 81 características de los municipios que propone la reducción dimensional, sugiere una clara estratificación de los municipios basada principalmente en su nivel de desarrollo financiero y económico, con subdivisiones adicionales basadas en infraestructura y acceso a servicios financieros especializados.', unsafe_allow_html=True)
+                        # ... (resto del contenido)
+                    
+                    st.plotly_chart(session_state.grafico2d2, use_container_width=True, height=250)
+                    
+                    with st.expander('Perfil del municipio en cada clúster', expanded=False):
+                        st.markdown(f'El Clúster Inicial (turquesa) tiene las siguientes características:', unsafe_allow_html=True)
+                        # ... (resto del contenido)
+                    
+                    st.plotly_chart(session_state.grafico2d3, use_container_width=True, height=250)
+                
+                # Actualizar pestaña activa
+                session_state.active_tab = 2
+                
+                # Prefetch para pestañas adyacentes
+                prefetch_tab_data(
+                    2, 
+                    datos, dataset_complete, df, df_normalizado, dataset_complete_geometry,
+                    variable_seleccionada_municipio, variable_seleccionada_numerica,
+                    variable_seleccionada_paracorrelacion, variable_seleccionada_categorica
+                )
+        
+        def render_tab4():
+            with tab4:
+                st.markdown("¿Qué patrones se encuentran en cada clúster?")
+                
+                # Cargar gráficos de clústers
+                if 'recuento_clusters' not in session_state:
+                    with st.spinner("Generando análisis de clústers..."):
+                        session_state.recuento_clusters = recuento(datos)
+                
+                if 'boxplots_clusters' not in session_state:
+                    with st.spinner("Generando boxplots por clústers..."):
+                        session_state.boxplots_clusters = boxplot_por_cluster(datos, variable_seleccionada_numerica)
+                
+                if 'histograma_por_clusters' not in session_state:
+                    with st.spinner("Generando histogramas por clústers..."):
+                        session_state.histograma_por_clusters = plot_histogram_clusters(datos, variable_seleccionada_numerica)
+                
+                with st.expander('Recuento por nivel de madurez', expanded=False):
+                    # Crear las columnas
+                    col1, col2 = st.columns(2)
+                    
+                    # Columna 1: Información de recuento
+                    with col1:
+                        st.markdown("""
+                        <div class="madurez-card">
+                            <br>
+                            <br>                
+                            <p><span class="madurez-count">Optimización:</span> <b style="color:#51C622">647</b> municipios</p>
+                            <p><span class="madurez-count">Definición:</span> <b style="color:#51C622">551</b> municipios</p>
+                            <p><span class="madurez-count">En desarrollo:</span> <b style="color:#51C622">627</b> municipios</p>
+                            <p><span class="madurez-count">Inicial:</span> <b style="color:#51C622">631</b> municipios</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Columna 2: Gráfico de barras
+                    with col2:
+                        st.plotly_chart(session_state.recuento_clusters, use_container_width=True, height=250)
+                
+                # Mostrar gráficos de análisis
+                st.plotly_chart(session_state.boxplots_clusters, use_container_width=True)
+                st.plotly_chart(session_state.histograma_por_clusters, use_container_width=True)
+                
+                # Actualizar pestaña activa
+                session_state.active_tab = 3
+                
+                # Prefetch para pestañas adyacentes
+                prefetch_tab_data(
+                    3, 
+                    datos, dataset_complete, df, df_normalizado, dataset_complete_geometry,
+                    variable_seleccionada_municipio, variable_seleccionada_numerica,
+                    variable_seleccionada_paracorrelacion, variable_seleccionada_categorica
+                )
+        
+        def render_tab5():
+            with tab5:
+                st.markdown(titulo_dinamico(variable_seleccionada_numerica), unsafe_allow_html=True)
+                
+                with st.expander('Análisis', expanded=False):
+                    st.markdown(f'Los diagramas de dispersión permiten visualizar las relaciones lineales y no lineales de las variables.', unsafe_allow_html=True)
+                    # ... (resto del análisis)
+                
+                # Cargar scatter plot
+                if 'fig_scatter' not in session_state:
+                    with st.spinner("Generando gráfico de correlación..."):
+                        session_state.fig_scatter = generate_scatter_with_annotations(
+                            datos, 
+                            variable_seleccionada_numerica, 
+                            variable_seleccionada_paracorrelacion, 
+                            variable_seleccionada_categorica
+                        )
+                
+                st.plotly_chart(session_state.fig_scatter, use_container_width=True, height=500)
+                
+                # Actualizar pestaña activa
+                session_state.active_tab = 4
+                
+                # Prefetch para pestañas adyacentes
+                prefetch_tab_data(
+                    4, 
+                    datos, dataset_complete, df, df_normalizado, dataset_complete_geometry,
+                    variable_seleccionada_municipio, variable_seleccionada_numerica,
+                    variable_seleccionada_paracorrelacion, variable_seleccionada_categorica
+                )
+        
+        def render_tab6():
+            with tab6:
+                with st.expander('Análisis', expanded=False):
+                    st.markdown(f'La clasificación proporcionada por el aprendizaje automático no supervisado sugiere que <span style="color:#51C622"> la madurez digital de los municipios no es aleatoria, sino que sigue patrones relacionados con factores financieros, socio-económicos y geográficos</span>. Cuando se realizaba el entrenamiento de los modelos y se evaluaban, se revisaron los pesos de cada variable en cada componente principal; donde llama la atención que son estadísticamente relevantes variables geográficas como la latitud, longitud y el número de vecinos cercanos en un radio de 5 km. Sugiriendo que la proximidad geográfica entre los municipios influye en su madurez digital debido a la infraestructura compartida y la movilidad de sus factores productivos.', unsafe_allow_html=True)
+                    # ... (resto del análisis)
+                
+                # Cargar mapa final
+                if 'fig_map_final' not in session_state:
+                    with st.spinner("Generando mapa geográfico..."):
+                        session_state.fig_map_final = generar_mapa_con_lugar(datos, lugar=variable_seleccionada_municipio)
+                
+                st.plotly_chart(session_state.fig_map_final, use_container_width=True, height=500)
+                
+                # Actualizar pestaña activa
+                session_state.active_tab = 5
+        
+        # Renderizar la pestaña seleccionada
+        # Detectamos qué pestaña está activa monitoreando los clics
+        # Este es un truco para detectar la pestaña activa, ya que Streamlit no tiene una API directa
+        tab1_clicked = tab1.selectbox('', [''], key='tab1_select', label_visibility="collapsed")
+        tab2_clicked = tab2.selectbox('', [''], key='tab2_select', label_visibility="collapsed")
+        tab3_clicked = tab3.selectbox('', [''], key='tab3_select', label_visibility="collapsed")
+        tab4_clicked = tab4.selectbox('', [''], key='tab4_select', label_visibility="collapsed")
+        tab5_clicked = tab5.selectbox('', [''], key='tab5_select', label_visibility="collapsed")
+        tab6_clicked = tab6.selectbox('', [''], key='tab6_select', label_visibility="collapsed")
+        
+        # Renderizar inicialmente la pestaña 1
+        render_tab1()
+        
+        # Detectar cambios en los selectores y actualizar componentes relevantes
+        if st.session_state.get('previous_municipio') != variable_seleccionada_municipio:
+            # Municipio cambió, limpiar gráficos relacionados
+            keys_to_clear = [
+                'fig_municipio', 'fig_ranking', 'cuadro_resumen', 'fig_hist_index', 
+                'grafico3d', 'grafico2d1', 'grafico2d2', 'grafico2d3',
+                'fig_map_final'
+            ]
+            
+            for key in keys_to_clear:
+                if key in session_state:
+                    del session_state[key]
+            
+            # Guardar el nuevo valor para la próxima comparación
+            session_state.previous_municipio = variable_seleccionada_municipio
+        
+        if st.session_state.get('previous_numerica') != variable_seleccionada_numerica:
+            # Variable numérica cambió, limpiar gráficos relacionados
+            keys_to_clear = [
+                'fig_hist', 'fig_boxplot', 'boxplots_clusters',
+                'histograma_por_clusters', 'fig_scatter'
+            ]
+            
+            for key in keys_to_clear:
+                if key in session_state:
+                    del session_state[key]
+            
+            # Guardar el nuevo valor para la próxima comparación
+            session_state.previous_numerica = variable_seleccionada_numerica
+        
+        if st.session_state.get('previous_categorica') != variable_seleccionada_categorica:
+            # Variable categórica cambió, limpiar histograma
+            if 'fig_hist' in session_state:
+                del session_state['fig_hist']
+            
+            if 'fig_scatter' in session_state:
+                del session_state['fig_scatter']
+            
+            # Guardar el nuevo valor para la próxima comparación
+            session_state.previous_categorica = variable_seleccionada_categorica
+        
+        if st.session_state.get('previous_correlacion') != variable_seleccionada_paracorrelacion:
+            # Variable de correlación cambió, limpiar scatter plot
+            if 'fig_scatter' in session_state:
+                del session_state['fig_scatter']
+            
+            # Guardar el nuevo valor para la próxima comparación
+            session_state.previous_correlacion = variable_seleccionada_paracorrelacion
+        
+        # Limpiar recursos no utilizados según la pestaña activa
+        cleanup_unused_resources(session_state.active_tab)
+        
+        # Forzar recolección de basura para liberar memoria
+        gc.collect()
+        
+    except Exception as e:
+        st.error(f"Error en la aplicación: {str(e)}")
+        logger.exception("Error en la aplicación:")
+
+if __name__ == "__main__":
+    main()
