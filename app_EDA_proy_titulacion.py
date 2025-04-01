@@ -1,3 +1,34 @@
+#######################
+# Importar  librerias #
+#######################
+import streamlit as st
+import pandas as pd
+import altair as alt
+import plotly.express as px
+import io
+import geopandas as gpd
+import numpy as np
+import json
+import plotly.graph_objects as go
+import plotly.io as pio
+import altair_viewer as altviewer
+import logging
+import folium
+import zipfile
+from streamlit import components
+from sklearn.linear_model import LinearRegression
+import folium
+from streamlit_folium import folium_static  # Importar folium_static para Streamlit
+from scipy.stats import gaussian_kde
+import pymongo
+from pymongo import MongoClient
+from gridfs import GridFS
+from io import BytesIO
+from dotenv import load_dotenv
+import os
+from bson import ObjectId
+from concurrent.futures import ThreadPoolExecutor
+
 # Optimización 1: Mejorar la conexión y consultas a MongoDB
 
 # 1. Establecer conexión una sola vez (singleton)
