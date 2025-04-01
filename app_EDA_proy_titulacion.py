@@ -1293,11 +1293,11 @@ with tab1:
         st.markdown(f'- <b style="color:#51C622">Estadísticas por Grupo:</b> Esta sección presenta un análisis exploratorio de datos para cada clúster. Aprende más sobre las características de los otros clústers y las principales características del clúster del municipio que seleccionaste', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Correlaciones:</b> ¿Te interesa conocer la relación líneal entre dos variables o características de tu municipio? Utiliza esta sección para profundizar en la relación de cada variable', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Geografía:</b> ¿Qué hay de la consistencia geográfica? ¿Hace sentido la clasificación que nos proporciona el modelo? ¿Quiénes son los vecinos geográficos más cercanos al municipio de interés y de qué tipo son?', unsafe_allow_html=True)
-        st.image("/fuentes/como_utilizar_1.png", caption="Página de Inicio.", use_container_width=True)
+        st.image("../fuentes/como_utilizar_1.png", caption="Página de Inicio.", use_container_width=True)
         st.markdown(f'- <b style="color:#51C622">Barra de navegación:</b> Navega y selecciona el municipio de tu interés, las variables continuas y categóricas que quieres visualizar durante el análisis.', unsafe_allow_html=True)
-        st.image("/fuentes/como_utilizar_2.png", caption="Se pueden seleccionar dos variables para análisis correlacional y una variable categórica.", use_container_width=True)
+        st.image("../fuentes/como_utilizar_2.png", caption="Se pueden seleccionar dos variables para análisis correlacional y una variable categórica.", use_container_width=True)
         st.markdown(f'Conoce el enfoque de la programación orientada a objetos y detalles de la aplicación.', unsafe_allow_html=True)
-        st.image("/fuentes/como_utilizar_3.png", caption="Enfoque de la aplicación y fuentes de información.", use_container_width=True)
+        st.image("../fuentes/como_utilizar_3.png", caption="Enfoque de la aplicación y fuentes de información.", use_container_width=True)
 
 with tab2:
     st.markdown(Titulo_dinamico2, unsafe_allow_html=True)
