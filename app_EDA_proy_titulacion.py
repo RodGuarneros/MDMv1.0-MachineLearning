@@ -1540,7 +1540,7 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         df_clean,
         x=x_variable,
         y=y_variable,
-        hover_data={'Lugar': True, categorical_variable: True},
+        custom_data=['Lugar', categorical_variable],
         color=categorical_variable,
         color_discrete_map=color_map
     )
