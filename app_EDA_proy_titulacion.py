@@ -8,7 +8,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+import gc
 import pandas as pd
 import altair as alt
 import plotly.express as px
