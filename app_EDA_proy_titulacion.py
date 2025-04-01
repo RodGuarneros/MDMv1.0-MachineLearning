@@ -89,10 +89,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+########################################################
+# Definir conexión a MongoDB (disponible para todas las consultas)
+########################################################
+@st.cache_resource
+def connect_to_mongo(mongo_uri):
+    client = MongoClient(mongo_uri)
+    return client['Municipios_Rodrigo']
 
-######################################
-# Integración y preparación de Datos #
-######################################
+########################################################
+# Funciones de acceso y procesamiento de datos
+########################################################
 
 # Función para convertir ObjectId a str
 def convert_objectid_to_str(document):
@@ -101,23 +108,20 @@ def convert_objectid_to_str(document):
             document[key] = str(value)
     return document
 
-# Función para mostrar el formulario solo una vez
+# Función para mostrar el contador de visitas
 def incrementar_contador_visitas():
     try:
-        # Obtener la URI de MongoDB desde los secretos
         mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-        # Conexión a MongoDB usando la URI desde los secretos
+        # Ahora se usa la función ya definida
         db = connect_to_mongo(mongo_uri)
         collection = db['visita']
-        
-        # Intentar obtener el contador de visitas
         visita = collection.find_one_and_update(
-            {"_id": "contador"},  # Usamos un único documento con id 'contador'
-            {"$inc": {"contador": 1}},  # Incrementamos el contador
-            upsert=True,  # Si no existe el documento, lo crea
-            return_document=pymongo.ReturnDocument.AFTER  # Usamos el valor correcto (AFTER)
+            {"_id": "contador"},
+            {"$inc": {"contador": 1}},
+            upsert=True,
+            return_document=pymongo.ReturnDocument.AFTER
         )
-        return visita['contador']  # Devuelve el valor del contador de visitas
+        return visita['contador']
     except Exception as e:
         st.error(f"Hubo un error al acceder a la base de datos: {e}")
         raise
@@ -125,43 +129,27 @@ def incrementar_contador_visitas():
 # Incrementar contador de visitas
 contador_visitas = incrementar_contador_visitas()
 
-# Conectar a MongoDB con caché para los polígonos y demás consultas
-@st.cache_resource
-def connect_to_mongo(mongo_uri):
-    client = MongoClient(mongo_uri)
-    return client['Municipios_Rodrigo']
-
-# Función para cargar y procesar los datos con cache
 @st.cache_data
 def bajando_procesando_datos():
     db = connect_to_mongo(st.secrets["MONGO"]["MONGO_URI"])
     collection = db['datos_finales']
-    # Obtener datos y convertir a DataFrame
     datos_raw = collection.find()
     datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
-    # Asegurarse de que los datos estén en Latin1
     for column in datos.select_dtypes(include=['object']).columns:
         datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
     categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
-    # Convertir a categoría con orden específico
-    datos['Madurez'] = pd.Categorical(
-        datos['Madurez'],
-        categories=categorias_orden,
-        ordered=False
-    )
+    datos['Madurez'] = pd.Categorical(datos['Madurez'], categories=categorias_orden, ordered=False)
     return datos
 
-# Llamar a la función para cargar y procesar los datos
 datos = bajando_procesando_datos()
 input_datos = datos
 
-# Procesar otras columnas como se mencionaba en el código original
+# Procesar columnas adicionales
 datos['Operadores Escala Pequeña BAF'] = datos['operadores_escal_pequeña_baf']
 datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
 datos['Penetración BAF (Fibra)'] = datos['penetracion_baf_fibra']
 datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
-# OBTENIENDO EL DATASET COMPLETO:
 @st.cache_data
 def bajando_procesando_datos_completos():
     db = connect_to_mongo(st.secrets["MONGO"]["MONGO_URI"])
@@ -175,7 +163,6 @@ def bajando_procesando_datos_completos():
 
 dataset_complete = bajando_procesando_datos_completos()
 
-# OBTENIENDO X PARA EL TRAINING NORMALIZER:
 @st.cache_data
 def bajando_procesando_X_entrenamiento():
     db = connect_to_mongo(st.secrets["MONGO"]["MONGO_URI"])
@@ -187,7 +174,6 @@ def bajando_procesando_X_entrenamiento():
 
 df = bajando_procesando_X_entrenamiento()
 
-# OBTENIENDO DF PCA NORMALIZER:
 @st.cache_data
 def bajando_procesando_df_normalizado():
     db = connect_to_mongo(st.secrets["MONGO"]["MONGO_URI"])
@@ -199,10 +185,10 @@ def bajando_procesando_df_normalizado():
 
 df_normalizado = bajando_procesando_df_normalizado()
 
-# Procesamiento de variables numéricas y categóricas
+# Procesamiento de variables
 variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
 variable_list_categoricala = list(input_datos.select_dtypes(include=['object', 'category']).columns)
-variable_list_municipio = list(input_datos['Lugar'].unique())  # Municipio seleccionado
+variable_list_municipio = list(input_datos['Lugar'].unique())
 
 columns_to_exclude_numeric = ['Cluster2','Unnamed: 0', 'Unnamed: 0.2', 'Unnamed: 0.2', 'cve_edo', 'cve_municipio', 'cvegeo', 'Estratos ICM', 'Estrato IDDM', 'Municipio', 'df1_ENTIDAD', 'df1_KEY MUNICIPALITY', 'df2_Clave Estado', 'df2_Clave Municipio', 'df3_Clave Estado', 'df3_Clave Municipio', 'df4_Clave Estado', 'df4_Clave Municipio']
 columns_to_exclude_categorical = ['_id','Lugar', 'Estado2', 'df2_Región', 'df3_Región', 'df3_Tipo de población', 'df4_Región', 'Municipio']
@@ -210,9 +196,8 @@ columns_to_exclude_categorical = ['_id','Lugar', 'Estado2', 'df2_Región', 'df3_
 variable_list_numeric = [col for col in variable_list_numerica if col not in columns_to_exclude_numeric]
 variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
 
-# Obtener el archivo GeoJSON desde MongoDB GridFS con caché
 @st.cache_data
-def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
+def consultando_base_de_datos(_db):
     fs = GridFS(_db)
     file = fs.find_one({'filename': 'municipios.geojson'})
     if file:
@@ -251,24 +236,16 @@ with st.sidebar:
         Asesor: <a href='https://www.infotec.mx/es_mx/Infotec/mario-graff-guerrero' style='color: #51C622; text-decoration: none;'> Ph.D. Mario Graff Guerrero </a>
     </h5>
     """, unsafe_allow_html=True)
-
     st.sidebar.image("fuentes/nube.png", use_column_width=True)
     st.markdown("<hr>", unsafe_allow_html=True)
-
     st.markdown("Principales características por Municipio:", unsafe_allow_html=True)
-    
     variable_seleccionada_municipio = st.selectbox('Selecciona el municipio de tu interés:', sorted(variable_list_municipio, reverse=False))
-
     st.markdown("<hr>", unsafe_allow_html=True)
-    
     st.markdown("Análisis Estadístico por Variable:", unsafe_allow_html=True)
-
     variable_seleccionada_numerica = st.selectbox('Selecciona la variable numérica de interés:', sorted(variable_list_numeric, reverse=False))
     variable_seleccionada_categorica = st.selectbox('Selecciona la variable categórica de interés:', sorted(variable_list_categorical, reverse=False))
     variable_seleccionada_paracorrelacion = st.selectbox('Selecciona la variable que quieras correlaccionar con la primera selección:', sorted(variable_list_numeric, reverse=False))
-
     st.markdown("<hr>", unsafe_allow_html=True)
-
     with st.expander('Enfoque de esta aplicación', expanded=False):
         st.write('''
             - Se basa en un enfoque de <span style="color:#51C622">"Programación Orientada a Objetos"</span>.
@@ -285,7 +262,6 @@ with st.sidebar:
                 3. La distribución geográfica de las variables.
             - La ventaja de un panel de control como este consiste en sus <span style="color:#51C622">economías de escala y la capacidad que tiene para presentar insights más profundos respecto a la población y sus funciones o actividades, tales como capacidad adquisitiva, preferencias, crédito al consumo, acceso a servicios de conectividad, empleo, sequías y hasta modelos predictivos.</span> 
             ''', unsafe_allow_html=True)
-
     with st.expander('Fuentes y detalles técnicos', expanded=False):
         st.write('''
             - Fuente: [Consejo Nacional de Población (CONAPO), consultado el 3 de febrero de 2024.](https://www.gob.mx/conapo).
@@ -293,26 +269,14 @@ with st.sidebar:
             - Autor: Rodrigo Guarneros ([LinkedIn](https://www.linkedin.com/in/guarneros/) y [X](https://twitter.com/RodGuarneros)).
             - Comentarios al correo electrónico rodrigo.guarneros@gmail.com
             ''', unsafe_allow_html=True)
-
     st.image('fuentes/cc.png', caption= '\u00A9 Copy Rights Rodrigo Guarneros, 2024', use_column_width=True)
     st.markdown("Esta aplicación web se rige por los derechos de propiedad de [Creative Commons CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Si quieres hacer algunos ajustes o adaptar esta aplicación te puedo ayudar, [escríbeme](rodrigo.guarneros@gmail.com).", unsafe_allow_html=True)
     st.markdown(f"Visitas al sitio: **{contador_visitas}**", unsafe_allow_html=True)
-
 
 ######################
 # Mapa por Municipio #
 ######################
 def crear_mapa_choropleth2(dataset, estado=None, cluster=None, lugar=None, municipio_inicial="MunicipioX"):
-    """
-    Crea un mapa choropleth interactivo mostrando clústeres y filtrando por estado, clúster o lugar.
-    
-    Parámetros:
-    - dataset: El dataset con los datos geoespaciales.
-    - estado: El estado por el cual filtrar (opcional).
-    - clúster: El número de clúster por el cual filtrar (opcional).
-    - lugar: El nombre del lugar (municipio) para filtrar (opcional).
-    - municipio_inicial: El nombre del municipio inicial para centrar el mapa si no se pasa un lugar.
-    """
     gdf = gpd.GeoDataFrame(dataset, geometry='geometry')
     if estado:
         gdf = gdf[gdf['Estado'] == estado]
@@ -332,10 +296,7 @@ def crear_mapa_choropleth2(dataset, estado=None, cluster=None, lugar=None, munic
         tiles="CartoDB dark_matter"
     )
     bounds = gdf.geometry.total_bounds
-    m.fit_bounds([
-        [bounds[1], bounds[0]],
-        [bounds[3], bounds[2]]
-    ])
+    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
     mapa_colores = {
         'En desarrollo': '#D20103',
         'Inicial': '#5DE2E7',
@@ -390,8 +351,7 @@ def plot_bar_chart(data, lugar_columna, indice_columna, lugar_seleccionado):
     plot_data = data.copy()
     plot_data[indice_columna] = pd.to_numeric(plot_data[indice_columna], errors='coerce')
     plot_data = plot_data.sort_values(by=indice_columna, ascending=True)
-    bar_colors = ['red' if lugar == lugar_seleccionado else 'dodgerblue' 
-                 for lugar in plot_data[lugar_columna]]
+    bar_colors = ['red' if lugar == lugar_seleccionado else 'dodgerblue' for lugar in plot_data[lugar_columna]]
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=plot_data[indice_columna],
@@ -404,22 +364,14 @@ def plot_bar_chart(data, lugar_columna, indice_columna, lugar_seleccionado):
                 width=0.5
             )
         ),
-        customdata=np.stack(( 
-            plot_data["Ranking"],
-            plot_data["Etapa_Madurez"],
-            plot_data[indice_columna]
-        ), axis=-1),
-        hovertemplate=( 
-            "Municipio: %{y}<br>" +
-            "Índice de Madurez: %{customdata[2]:.10f}<br>" +
-            "Lugar en el Ranking: %{customdata[0]}<br>" +
-            "Madurez: %{customdata[1]}<extra></extra>"
-        )
+        customdata=np.stack((plot_data["Ranking"], plot_data["Etapa_Madurez"], plot_data[indice_columna]), axis=-1),
+        hovertemplate=("Municipio: %{y}<br>" +
+                       "Índice de Madurez: %{customdata[2]:.10f}<br>" +
+                       "Lugar en el Ranking: %{customdata[0]}<br>" +
+                       "Madurez: %{customdata[1]}<extra></extra>")
     ))
     annotations = []
-    for lugar, ranking, valor in zip(plot_data[lugar_columna], 
-                                   plot_data["Ranking"], 
-                                   plot_data[indice_columna]):
+    for lugar, ranking, valor in zip(plot_data[lugar_columna], plot_data["Ranking"], plot_data[indice_columna]):
         annotations.append(dict(
             xref='paper', yref='y',
             x=0, y=lugar,
@@ -511,11 +463,7 @@ def crear_display(data, lugar_seleccionado):
         x=0.5,
         y=0.80,
         showarrow=False,
-        font=dict(
-            family="Arial",
-            size=12,
-            color="#050505"
-        ),
+        font=dict(family="Arial", size=12, color="#050505"),
         align="center"
     )
     fig.add_annotation(
@@ -523,11 +471,7 @@ def crear_display(data, lugar_seleccionado):
         x=0.5,
         y=0.35,
         showarrow=False,
-        font=dict(
-            family="Arial",
-            size=37,
-            color="#050505"
-        ),
+        font=dict(family="Arial", size=37, color="#050505"),
         align="center"
     )
     fig.update_layout(
@@ -810,7 +754,7 @@ def generate_boxplot_with_annotations(df, variable, lugar_seleccionado):
     )
     return fig
 
-fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_seleccionada_numerica, variable_seleccionado=variable_seleccionada_municipio)    
+fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_seleccionada_numerica, lugar_seleccionado=variable_seleccionada_municipio)
 
 #################
 ## 3D plot PCA ##
@@ -830,9 +774,7 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         pca_df, 
         x='PCA1', y='PCA2', z='PCA3',
         color='Madurez',
-        labels={'PCA1': 'Componente PC1', 
-                'PCA2': 'Componente PC2', 
-                'PCA3': 'Componente PC3'},
+        labels={'PCA1': 'Componente PC1', 'PCA2': 'Componente PC2', 'PCA3': 'Componente PC3'},
         hover_data=['Lugar'],
         category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
         color_discrete_map=color_map
@@ -845,16 +787,12 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
                              x='PCA1', y='PCA2', z='PCA3', hover_data=['Lugar'],
                              color_discrete_map={'Madurez': 'green'}).data[0]
             )
-            fig.update_traces(marker=dict(size=20, color='green', opacity=1), 
-                            selector=dict(name=lugar_seleccionado))
+            fig.update_traces(marker=dict(size=20, color='green', opacity=1), selector=dict(name=lugar_seleccionado))
     fig.update_traces(
         marker=dict(
             size=6,
             opacity=0.7,
-            line=dict(
-                width=0.02,
-                color='gray'
-            )
+            line=dict(width=0.02, color='gray')
         )
     )
     fig.update_layout(
@@ -870,21 +808,9 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
             xaxis_title="Componente PC1",
             yaxis_title="Componente PC2",
             zaxis_title="Componente PC3",
-            xaxis=dict(
-                titlefont=dict(color='white'),
-                gridcolor='white',
-                zerolinecolor='white'
-            ),
-            yaxis=dict(
-                titlefont=dict(color='white'),
-                gridcolor='white',
-                zerolinecolor='white'
-            ),
-            zaxis=dict(
-                titlefont=dict(color='white'),
-                gridcolor='white',
-                zerolinecolor='white'
-            ),
+            xaxis=dict(titlefont=dict(color='white'), gridcolor='white', zerolinecolor='white'),
+            yaxis=dict(titlefont=dict(color='white'), gridcolor='white', zerolinecolor='white'),
+            zaxis=dict(titlefont=dict(color='white'), gridcolor='white', zerolinecolor='white'),
             bgcolor='rgb(0, 0, 0)',
             xaxis_showgrid=True,
             yaxis_showgrid=True,
@@ -892,7 +818,7 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         ),
         font=dict(color='white'),
         paper_bgcolor='rgb(0, 0, 0)',
-        plot_bgcolor='rgb(0, 0, 0)',
+        plot_bgcolor='rgb(0, 0, 0)'
     )
     return fig
 
@@ -916,8 +842,7 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
     fig = px.scatter(pca_df, 
                      x='PCA1', y='PCA2',
                      color='Madurez',
-                     labels={'PCA1': 'Componente PC1', 
-                            'PCA2': 'Componente PC2'},
+                     labels={'PCA1': 'Componente PC1', 'PCA2': 'Componente PC2'},
                      hover_data=['Lugar'],
                      category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
                      color_discrete_map=color_map)
@@ -929,30 +854,18 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
                            x='PCA1', y='PCA2', hover_data=['Lugar'],
                            color_discrete_map={'Madurez': 'green'}).data[0]
             )
-            fig.update_traces(marker=dict(size=10, color='green', opacity=1), 
-                             selector=dict(name=lugar_seleccionado))
+            fig.update_traces(marker=dict(size=10, color='green', opacity=1), selector=dict(name=lugar_seleccionado))
     fig.update_traces(
-        marker=dict(
-            size=8,
-            opacity=0.7,
-            line=dict(
-                width=0.02,
-                color='gray'
-            )
-        )
+        marker=dict(size=8, opacity=0.7, line=dict(width=0.02, color='gray'))
     )
     fig.update_layout(
         title="PC2 vs. PC1 (2D)",
         title_x=0.3,
         showlegend=True,
-        legend=dict(
-            title=dict(text='Madurez'),
-            itemsizing='constant',
-            font=dict(color='white'),
-        ),
+        legend=dict(title=dict(text='Madurez'), itemsizing='constant', font=dict(color='white')),
         font=dict(color='white'),
         paper_bgcolor='rgb(0, 0, 0)',
-        plot_bgcolor='rgb(0, 0, 0)',
+        plot_bgcolor='rgb(0, 0, 0)'
     )
     return fig
 
@@ -995,23 +908,13 @@ def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado
                 )
             )
     fig.update_traces(
-        marker=dict(
-            size=8,
-            opacity=0.7,
-            line=dict(
-                width=0.5,
-                color='gray'
-            )
-        )
+        marker=dict(size=8, opacity=0.7, line=dict(width=0.5, color='gray'))
     )
     fig.update_layout(
         title="PC1 vs. PC3 (2D)",
         title_x=0.5,
         showlegend=True,
-        legend=dict(
-            title=dict(text='Etapa de Madurez'),
-            itemsizing='constant'
-        ),
+        legend=dict(title=dict(text='Etapa de Madurez'), itemsizing='constant'),
         paper_bgcolor='rgb(0, 0, 0)',
         plot_bgcolor='rgb(0, 0, 0)',
         font=dict(color='white')
@@ -1038,8 +941,7 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
     fig = px.scatter(pca_df, 
                      x='PCA2', y='PCA3',
                      color='Madurez',
-                     labels={'PCA2': 'Componente PC2', 
-                            'PCA3': 'Componente PC3'},
+                     labels={'PCA2': 'Componente PC2', 'PCA3': 'Componente PC3'},
                      hover_data=['Lugar'],
                      category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
                      color_discrete_map=color_map)
@@ -1047,34 +949,20 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
         lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
         if not lugar_df.empty:
             fig.add_trace(
-                px.scatter(lugar_df, 
-                           x='PCA2', y='PCA3', hover_data=['Lugar'],
-                           color_discrete_map={'Madurez': 'green'}).data[0]
+                px.scatter(lugar_df, x='PCA2', y='PCA3', hover_data=['Lugar'], color_discrete_map={'Madurez': 'green'}).data[0]
             )
-            fig.update_traces(marker=dict(size=10, color='green', opacity=1), 
-                             selector=dict(name=lugar_seleccionado))
+            fig.update_traces(marker=dict(size=10, color='green', opacity=1), selector=dict(name=lugar_seleccionado))
     fig.update_traces(
-        marker=dict(
-            size=8,
-            opacity=0.7,
-            line=dict(
-                width=0.02,
-                color='gray'
-            )
-        )
+        marker=dict(size=8, opacity=0.7, line=dict(width=0.02, color='gray'))
     )
     fig.update_layout(
         title="PC3 vs. PC2 (2D)",
         title_x=0.3,
         showlegend=True,
-        legend=dict(
-            title=dict(text='Madurez'),
-            itemsizing='constant',
-            font=dict(color='white'),
-        ),
+        legend=dict(title=dict(text='Madurez'), itemsizing='constant', font=dict(color='white')),
         font=dict(color='white'),
         paper_bgcolor='rgb(0, 0, 0)',
-        plot_bgcolor='rgb(0, 0, 0)',
+        plot_bgcolor='rgb(0, 0, 0)'
     )
     return fig
 
@@ -1110,10 +998,7 @@ def boxplot_por_cluster(df, variable):
             'std_' + variable: True,
         }
     )
-    fig.update_traces(marker=dict(
-        opacity=0.6,
-        line=dict(color='rgba(255, 165, 0, 0.5)', width=1)
-    ))
+    fig.update_traces(marker=dict(opacity=0.6, line=dict(color='rgba(255, 165, 0, 0.5)', width=1)))
     return fig
 
 boxplots_clusters = boxplot_por_cluster(datos, variable_seleccionada_numerica)
@@ -1186,7 +1071,6 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         'Definición': '#CC6CE7',
         'Optimización': '#51C622',
     }
-    # Se usa custom_data para disponer de la información en el hovertemplate
     fig = px.scatter(
         df_clean,
         x=x_variable,
@@ -1315,7 +1199,7 @@ def generar_mapa_con_lugar(df, lugar=None):
     )
     return fig
 
-fig_map_final = generar_mapa_con_lugar(input_datos, lugar = variable_seleccionada_municipio)
+fig_map_final = generar_mapa_con_lugar(input_datos, lugar=variable_seleccionada_municipio)
 
 ###################################
 #### Recuento de Clusters #########
@@ -1373,7 +1257,7 @@ def titulo_dinamico3(variable):
 Titulo_dinamico3 = titulo_dinamico3(variable=variable_seleccionada_municipio)
 
 # Dashboard Main Panel
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Presentación", "Municipio", "Madurez Digital","Estadísiticas por Grupo", "Análisis Relacional","Geografía"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Presentación", "Municipio", "Madurez Digital", "Estadísiticas por Grupo", "Análisis Relacional", "Geografía"])
 
 with tab1:
     with st.expander('¿Para qué sirve esta aplicación?', expanded=False):
@@ -1409,11 +1293,11 @@ with tab1:
         st.markdown(f'- <b style="color:#51C622">Estadísticas por Grupo:</b> Esta sección presenta un análisis exploratorio de datos para cada clúster. Aprende más sobre las características de los otros clústers y las principales características del clúster del municipio que seleccionaste', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Correlaciones:</b> ¿Te interesa conocer la relación líneal entre dos variables o características de tu municipio? Utiliza esta sección para profundizar en la relación de cada variable', unsafe_allow_html=True)
         st.markdown(f'- <b style="color:#51C622">Geografía:</b> ¿Qué hay de la consistencia geográfica? ¿Hace sentido la clasificación que nos proporciona el modelo? ¿Quiénes son los vecinos geográficos más cercanos al municipio de interés y de qué tipo son?', unsafe_allow_html=True)
-        st.image("fuentes/como_utilizar_1.png", caption="Página de Inicio.", use_column_width=True)
+        st.image("fuentes/como_utilizar_1.png", caption="Página de Inicio.", use_container_width=True)
         st.markdown(f'- <b style="color:#51C622">Barra de navegación:</b> Navega y selecciona el municipio de tu interés, las variables continuas y categóricas que quieres visualizar durante el análisis.', unsafe_allow_html=True)
-        st.image("fuentes/como_utilizar_2.png", caption="Se pueden seleccionar dos variables para análisis correlacional y una variable categórica.", use_column_width=True)
+        st.image("fuentes/como_utilizar_2.png", caption="Se pueden seleccionar dos variables para análisis correlacional y una variable categórica.", use_container_width=True)
         st.markdown(f'Conoce el enfoque de la programación orientada a objetos y detalles de la aplicación.', unsafe_allow_html=True)
-        st.image("fuentes/como_utilizar_3.png", caption="Enfoque de la aplicación y fuentes de información.", use_column_width=True)
+        st.image("fuentes/como_utilizar_3.png", caption="Enfoque de la aplicación y fuentes de información.", use_container_width=True)
 
 with tab2:
     st.markdown(Titulo_dinamico2, unsafe_allow_html=True)
@@ -1465,72 +1349,57 @@ with tab3:
                 f'- <span style="color:#51C622">El componente principal primario (PC1)</span>, que explica el 48.23% de la varianza en todos los datos, puede considerarse como un <span style="color:#51C622">patrón o índice de actividad financiera</span>, asociado por orden de importancia a las siguientes características: (i) Ingresos promedio por vivienda; (ii) Terminales Punto de Venta (TPV); (iii) Transacciones con TPV de Banca Múltiple (BM); (iv) Transacciones en cajeros de BM; (v) Tarjetas de Débito; (vi) Ingresos promedio del sector comercial; (vii) Población Económicamente Activa (PEA); (viii) Cuentas Banca Popular; (ix) Cuentas de BM; (x) Transacciones N4 (personas de alto poder adquisitivo que prefieren servicios exclusivos sin límites de depósitos); (xi) Transacciones N3 (equivalentes a MX$81,112 pesos); (xii) Viviendas habitables, principalmente.',
                 unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#51C622">Es significativo que el PC1 explique casi la mitad de la varianza total de los datos</span>, lo que sugiere que <b>la actividad financiera es el factor más diferenciador entre los municipios</b>.', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Es significativo que el PC1 explique casi la mitad de la varianza total de los datos</span>, lo que sugiere que <b>la actividad financiera es el factor más diferenciador entre los municipios</b>.',
+                unsafe_allow_html=True)
             st.markdown(
                 f'- <span style="color:#51C622">El segundo componente (PC2)</span>, que explica el 15% de la varianza en el total de los datos, se considera un <span style="color:#51C622">patrón o índice de servicios digitales</span>. Está asociado por orden de importancia con las siguientes variables: (i) PEA; (ii) Ingresos promedio por vivienda; (iii) Viviendas habitables; (iv) Viviendas con TV; (v) Viviendas con celular; (vi) Viviendas con audio radiodifundido; (vii) Transacciones TPV BM; (viii) Ingresos promedio del sector comercial; (ix) Viviendas con TV de paga; (x) Viviendas con Internet; (xi) Ingresos promedio del sector manufacturero; (xii) Cuentas con capacidad móvil, entre otras.',
                 unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#51C622">Es significativo que la PEA tenga el mayor de los pesos en el componente principal PCA2, sugiriendo <b>una fuerte relación entre la Población Económicamente Activa y los servicios digitiales</b></span>.', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">Es significativo que la PEA tenga el mayor de los pesos en el componente principal PCA2, sugiriendo <b>una fuerte relación entre la Población Económicamente Activa y los servicios digitiales</b></span>.',
+                unsafe_allow_html=True)
             st.markdown(
                 f'- <span style="color:#51C622">El tercer componente (PC3)</span>, que explica el 8.32% de la varianza total, se considera un <span style="color:#51C622">patrón o índice de adopción financiera</span>. Está asociado con las siguientes variables: (i) Transacciones TPV; (ii) Tarjetas de débito; (iii) Tarjetas de débito de Banca de Desarrollo; (iv) Cuentas de Banca Popular; (v) Cuentas de Cooperativas; (vi) PEA; (vii) Cuentas de Banca de Desarrollo; (viii) Cuentas N4; (ix) Cuentas de ahorro popular; (x) Cuentas de ahorro cooperativas; (xi) Viviendas habitables.',
                 unsafe_allow_html=True)
             st.markdown(
-                f'- Mientras PC1 se centra en la actividad financiera general, PC3 captura específicamente la adopción de servicios financieros más específicos (banca popular, cooperativas, desarrollo) <span style="color:#C2185B">La presencia de diferentes tipos de cuentas y servicios financieros sugiere efectivamente un patrón de adopción más que de uso intensivo</span>.', unsafe_allow_html=True)
+                f'- Mientras PC1 se centra en la actividad financiera general, PC3 captura específicamente la adopción de servicios financieros más específicos (banca popular, cooperativas, desarrollo) <span style="color:#C2185B">La presencia de diferentes tipos de cuentas y servicios financieros sugiere efectivamente un patrón de adopción más que de uso intensivo</span>.',
+                unsafe_allow_html=True)
             st.markdown(
-                f'- <span style="color:#51C622">En conclusión, la visualización 3D nos permite ver que estos grupos no son completamente discretos sino que hay transiciones suaves entre ellos, lo que sugiere <b>una transición continua de desarrollo financiero-digital en los municipios mexicanos</b>.</span>', unsafe_allow_html=True)
+                f'- <span style="color:#51C622">En conclusión, la visualización 3D nos permite ver que estos grupos no son completamente discretos sino que hay transiciones suaves entre ellos, lo que sugiere <b>una transición continua de desarrollo financiero-digital en los municipios mexicanos</b>.</span>',
+                unsafe_allow_html=True)
         st.plotly_chart(grafico3d, use_container_width=True, height=500)
         with st.expander('Patrones en los clústers', expanded=False):
             st.markdown(f'La separación entre clústers tiene mejor visibilidad en tres dimensiones, en general se puede decir que:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">El clúster de los municipios en desarrollo (color rojo) es el más numeroso y disperso.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Los clústers Inicial (turquesa) y Definición (morado) muestran una cohesión interna mucho mayor.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">El clúster con los municipios en fase de Optimización (color verde) es el más compacto y diferenciado.</span>', unsafe_allow_html=True) 
+            st.markdown(f'- <span style="color:#51C622">El clúster de los municipios en desarrollo (color rojo) es el más numeroso y disperso.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Los clústers Inicial (turquesa) y Definición (morado) muestran una cohesión interna mucho mayor.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">El clúster con los municipios en fase de Optimización (color verde) es el más compacto y diferenciado.</span>', unsafe_allow_html=True)
         st.plotly_chart(grafico2d1, use_container_width=True, height=250)
     with col2:
         with st.expander('Estructura de los clústers', expanded=False):
             st.markdown(f'Esta segmentación, resultado de las similitudes en las 81 características de los municipios que propone la reducción dimensional, sugiere una clara estratificación de los municipios basada principalmente en su nivel de desarrollo financiero y económico, con subdivisiones adicionales basadas en infraestructura y acceso a servicios financieros especializados.', unsafe_allow_html=True)
             st.markdown(f'En cuanto a la estructura de los clústers, se puede ver lo siguiente: <span style="color:#51C622">(i) Se identifican 4 grupos claramente diferenciados (clústers Inicio, En desarrollo, Definición y Optimización); (ii) la visualización en 2D y 3D muestra que estos grupos tienen fronteras relativamente bien definidas, y (iii) hay cierto solapamiento en las zonas de transición entre clústers, lo cual es natural en datos municipales que pueden compartir características</span>', unsafe_allow_html=True)
-            st.markdown(f'La distribución espacial en los clústers es también importante: <span style="color:#51C622">(i) el PCA1 (eje horizontal) explica la mayor variación, abarcando aproximadamente de -0.6 a 0.8; (ii) el PCA2 muestra una dispersión menor, aproximadamente de -0.5 a 0.5, y (iii) el PCA3 añade una dimensión adicional que ayuda a separar mejor algunos grupos que parecían solapados en 2D </span>.', unsafe_allow_html=True)
+            st.markdown(f'La distribución espacial en los clústers es también importante: <span style="color:#51C622">(i) el PCA1 (eje horizontal) explica la mayor variación, abarcando aproximadamente de -0.6 a 0.8; (ii) el PCA2 muestra una dispersión menor, aproximadamente de -0.5 a 0.5, y (iii) el PCA3 añade una dimensión adicional que ayuda a separar mejor algunos grupos que parecían solapados en 2D </span>', unsafe_allow_html=True)
         st.plotly_chart(grafico2d2, use_container_width=True, height=250)
         with st.expander('Perfil del municipio en cada clúster', expanded=False):
             st.markdown(f'El Clúster Inicial (turquesa) tiene las siguientes características:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo/Medio en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios con menor desarrollo financiero y digital, rurales o semi-urbanos con oportunidades de desarrollo en los tres aspectos. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b></span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Bajo en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Bajo/Medio en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Bajo en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+            st.markdown(f'<b>Interpretación: Municipios con menor desarrollo financiero y digital, rurales o semi-urbanos con oportunidades de desarrollo en los tres aspectos. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b>', unsafe_allow_html=True)
             st.markdown(f'El Clúster en desarrollo (rojo) tiene las siguientes características:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Bajo/medio en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios con alta actividad financiera pero con brechas en infraestructura digital. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b></span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Bajo en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Bajo/medio en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+            st.markdown(f'<b>Interpretación: Municipios con alta actividad financiera pero con brechas en infraestructura digital. Cuenta con servicios financieros/comerciales en desarrollo y escasa infraestructura digital.</b>', unsafe_allow_html=True)
             st.markdown(f'El Clúster en la fase de definición (morado) tiene las siguientes características:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Valores medios en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Dispersión amplia en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Variaciión en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios en transición, con niveles moderados de actividad financiera y desarrollo variable en servicios digitales.</b></span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Valores medios en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Dispersión amplia en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Variación en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+            st.markdown(f'<b>Interpretación: Municipios en transición, con niveles moderados de actividad financiera y desarrollo variable en servicios digitales.</b>', unsafe_allow_html=True)
             st.markdown(f'El Clúster en la fase de optimización (verde) tiene las siguientes características:', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Alto en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
-            st.markdown(
-                f'- <span style="color:#51C622">Medio/alto en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
-            st.markdown(
-                f'<b>Interpretación: Municipios urbanos y semi-urbanos altamente desarrollados con buena infraestructura digital y alto nivel de actividad financiera.</b></span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Alto en PC1 (actividad financiera): Se ubica en valores positivos altos.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Alto en PC2 (servicios digitales): Valores negativos o neutros.</span>', unsafe_allow_html=True)
+            st.markdown(f'- <span style="color:#51C622">Medio/alto en PC3 (adopción financiera).</span>', unsafe_allow_html=True) 
+            st.markdown(f'<b>Interpretación: Municipios urbanos y semi-urbanos altamente desarrollados con buena infraestructura digital y alto nivel de actividad financiera.</b>', unsafe_allow_html=True)
         st.plotly_chart(grafico2d3, use_container_width=True, height=250)
 with tab4:
     st.markdown("¿Qué patrones se encuentran en cada clúster?")
@@ -1539,8 +1408,7 @@ with tab4:
         with col1:
             st.markdown("""
             <div class="madurez-card">
-                <br>
-                <br>                
+                <br><br>                
                 <p><span class="madurez-count">Optimización:</span> <b style="color:#51C622">647</b> municipios</p>
                 <p><span class="madurez-count">Definición:</span> <b style="color:#51C622">551</b> municipios</p>
                 <p><span class="madurez-count">En desarrollo:</span> <b style="color:#51C622">627</b> municipios</p>
