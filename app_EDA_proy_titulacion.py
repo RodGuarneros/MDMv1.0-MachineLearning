@@ -1540,11 +1540,10 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         df_clean,
         x=x_variable,
         y=y_variable,
-        custom_data=['Lugar', categorical_variable],
+        hover_data={'Lugar': True, categorical_variable: True},
         color=categorical_variable,
         color_discrete_map=color_map
     )
-
 
     # Compute adjusted R² and regression line equation
     X = df_clean[[x_variable]].values
@@ -1958,7 +1957,7 @@ with tab3:
 
         with st.expander('Estructura de los clústers', expanded=False):
             st.markdown(f'Esta segmentación, resultado de las similitudes en las 81 características de los municipios que propone la reducción dimensional, sugiere una clara estratificación de los municipios basada principalmente en su nivel de desarrollo financiero y económico, con subdivisiones adicionales basadas en infraestructura y acceso a servicios financieros especializados.', unsafe_allow_html=True)
-            st.markdown(f'En cuanto a la estructura de los clústers, se puede ver lo siguiente: <span style="color:#51C622">(i) Se identifican 4 grupos claramente diferenciados (clústers Inicio, En desarrollo, Definición y Optimización); (ii) la visualización en 2D y 3D muestra que estos grupos tienen fronteras relativamente bien definidas, y (iii) hay cierto solapamiento en las zonas de transición entre clústers, lo cual es natural en datos municipales que pueden compartir características.</span>', unsafe_allow_html=True)
+            st.markdown(f'En cuanto a la estructura de los clústers, se puede ver lo siguiente: <span style="color:#51C622">(i) Se identifican 4 grupos claramente diferenciados (clústers Inicio, En desarrollo, Definición y Optimización); (ii) la visualización en 2D y 3D muestra que estos grupos tienen fronteras relativamente bien definidas, y (iii) hay cierto solapamiento en las zonas de transición entre clústers, lo cual es natural en datos municipales que pueden compartir características</span>', unsafe_allow_html=True)
             st.markdown(f'La distribución espacial en los clústers es también importante: <span style="color:#51C622">(i) el PCA1 (eje horizontal) explica la mayor variación, abarcando aproximadamente de -0.6 a 0.8; (ii) el PCA2 muestra una dispersión menor, aproximadamente de -0.5 a 0.5, y (iii) el PCA3 añade una dimensión adicional que ayuda a separar mejor algunos grupos que parecían solapados en 2D </span>.', unsafe_allow_html=True)
         st.plotly_chart(grafico2d2, use_container_width=True, height=250)
 
