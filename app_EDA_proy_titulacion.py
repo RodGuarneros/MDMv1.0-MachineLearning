@@ -2,6 +2,13 @@
 # Importar  librerias #
 #######################
 import streamlit as st
+st.set_page_config(
+    page_title="Aprendizaje Automático para los Municipios de México",
+    page_icon="📱",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import altair as alt
 import plotly.express as px
@@ -1822,12 +1829,6 @@ def optimizar_interfaz():
     """, unsafe_allow_html=True)
     
     # Configuración de la página optimizada
-    st.set_page_config(
-        page_title="Aprendizaje Automático para los Municipios de México",
-        page_icon="📱",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
     
     # Habilitar tema oscuro para Altair
     alt.themes.enable("dark")
