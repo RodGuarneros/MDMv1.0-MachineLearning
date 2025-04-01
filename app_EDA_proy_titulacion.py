@@ -1202,9 +1202,10 @@ def plot_histogram_clusters(df, numeric_column, nbins=30):
 
 # 3. Optimizar scatter plot con regresión
 @st.cache_data
-def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_variable, max_points=2000):
+# Modificación del scatter plot con regresión (continuación)
+def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_variable, lugar_seleccionado=None, max_points=2000):
     """
-    Versión optimizada del scatter plot con regresión
+    Versión modificada del scatter plot para destacar municipio seleccionado en naranja y tamaño más grande
     """
     # Mapa de colores
     color_map = {
@@ -1219,11 +1220,24 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
     
     # Limitar número de puntos para mejor rendimiento
     if len(df_clean) > max_points:
-        df_clean = df_clean.groupby(categorical_variable, group_keys=False).apply(
-            lambda x: x.sample(min(int(max_points * len(x) / len(df_clean)), len(x)), random_state=42)
-        )
+        # Primero preservar el municipio seleccionado
+        df_seleccionado = df_clean[df_clean['Lugar'] == lugar_seleccionado] if lugar_seleccionado else pd.DataFrame()
+        df_resto = df_clean[df_clean['Lugar'] != lugar_seleccionado] if lugar_seleccionado else df_clean
+        
+        # Muestrear estratificado por categoría
+        muestra_size = max_points - len(df_seleccionado)
+        if muestra_size > 0 and len(df_resto) > muestra_size:
+            df_resto = df_resto.groupby(categorical_variable, group_keys=False).apply(
+                lambda x: x.sample(min(int(muestra_size * len(x) / len(df_resto)), len(x)), random_state=42)
+            )
+        
+        # Combinar municipio seleccionado con el resto muestreado
+        if not df_seleccionado.empty:
+            df_clean = pd.concat([df_seleccionado, df_resto])
+        else:
+            df_clean = df_resto
 
-    # Crear el scatter plot
+    # Crear el scatter plot básico
     fig = px.scatter(
         df_clean,
         x=x_variable,
@@ -1231,7 +1245,7 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         hover_data={'Lugar': True, categorical_variable: True},
         color=categorical_variable,
         color_discrete_map=color_map,
-        opacity=0.7  # Reducir opacidad para ver mejor patrones
+        opacity=0.7
     )
 
     # Calcular regresión de manera eficiente
@@ -1252,9 +1266,9 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
     # Ecuación de regresión
     regression_equation = f"y = {slope:.4f}x + {intercept:.4f}"
 
-    # Añadir línea de regresión de manera eficiente
+    # Añadir línea de regresión
     x_min, x_max = df_clean[x_variable].min(), df_clean[x_variable].max()
-    x_range = np.linspace(x_min, x_max, 50)  # Reducir puntos para mejor rendimiento
+    x_range = np.linspace(x_min, x_max, 50)
     y_predicted = slope * x_range + intercept
     
     fig.add_scatter(
@@ -1264,6 +1278,28 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         name='Regresión',
         line=dict(color='orange', dash='dash', width=1.5)
     )
+
+    # CAMBIO: Resaltar el municipio seleccionado con color naranja y tamaño más grande
+    if lugar_seleccionado:
+        df_lugar = df_clean[df_clean['Lugar'] == lugar_seleccionado]
+        if not df_lugar.empty:
+            fig.add_scatter(
+                x=df_lugar[x_variable],
+                y=df_lugar[y_variable],
+                mode='markers',
+                marker=dict(
+                    size=15,  # Tamaño más grande
+                    color='#FFA500',  # Color naranja
+                    line=dict(
+                        width=1,
+                        color='white'  # Borde blanco para mayor visibilidad
+                    )
+                ),
+                name=f'Municipio: {lugar_seleccionado}',
+                hovertemplate=f'<b>Municipio: {lugar_seleccionado}</b><br>' +
+                              f'<b>{x_variable}</b>: %{{x:.2f}}<br>' +
+                              f'<b>{y_variable}</b>: %{{y:.2f}}<extra></extra>'
+            )
 
     # Optimizar layout
     fig.update_layout(
@@ -1315,20 +1351,22 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         )
     )
 
-    # Optimizar hover template
+    # Optimizar hover template para el resto de puntos
     fig.update_traces(
         hovertemplate='<b>%{customdata[0]}</b><br>' +
                     f'<b>{x_variable}</b>: %{{x:.2f}}<br>' +
-                    f'<b>{y_variable}</b>: %{{y:.2f}}<extra></extra>'
+                    f'<b>{y_variable}</b>: %{{y:.2f}}<extra></extra>',
+        selector=dict(mode='markers')
     )
 
     return fig
 
 # 4. Optimizar mapa con clústers
 @st.cache_data
+# Modificación del mapa completo
 def generar_mapa_con_lugar(df, lugar=None, max_points=3000):
     """
-    Versión optimizada del mapa con clústers
+    Versión optimizada del mapa con clústers que destaca el municipio seleccionado en naranja y tamaño más grande
     """
     # Mapa de colores
     color_map = {
@@ -1390,7 +1428,7 @@ def generar_mapa_con_lugar(df, lugar=None, max_points=3000):
         size_max=8  # Tamaño máximo de los marcadores
     )
 
-    # Resaltar lugar seleccionado
+    # CAMBIO: Resaltar lugar seleccionado con naranja y tamaño mucho más grande
     if lugar:
         lugar_df = plot_data[plot_data['Lugar'] == lugar]
         if not lugar_df.empty:
@@ -1401,13 +1439,17 @@ def generar_mapa_con_lugar(df, lugar=None, max_points=3000):
                     lon=lugar_df["Longitud"],
                     mode='markers',
                     marker=dict(
-                        size=12,
-                        color='#ffa500',
-                        opacity=1
+                        size=20,  # Tamaño mucho más grande
+                        color='#FFA500',  # Color naranja
+                        opacity=1,
+                        symbol='circle',  # Símbolo circular
+                        sizemode='diameter',  # Modo de tamaño
+                        sizeref=1  # Referencia de tamaño
                     ),
-                    name=lugar,
+                    name=f"Seleccionado: {lugar}",
                     text=lugar_df["Lugar"],
-                    hoverinfo='text'
+                    hoverinfo='text',
+                    hovertemplate='<b>Lugar: %{text}</b><br>Seleccionado<extra></extra>'
                 )
             )
 
@@ -1419,12 +1461,16 @@ def generar_mapa_con_lugar(df, lugar=None, max_points=3000):
         legend=dict(
             title="Nivel de Madurez",
             itemsizing="constant",
-            traceorder="normal"
+            traceorder="normal",
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
         )
     )
 
     return fig
-
 
 
 
