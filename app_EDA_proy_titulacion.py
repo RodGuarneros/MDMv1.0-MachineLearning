@@ -29,6 +29,10 @@ import os
 from bson import ObjectId
 from concurrent.futures import ThreadPoolExecutor
 
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
+
 # Optimización 1: Mejorar la conexión y consultas a MongoDB
 
 # 1. Establecer conexión una sola vez (singleton)
