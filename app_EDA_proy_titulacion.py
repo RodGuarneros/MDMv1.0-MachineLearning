@@ -1332,7 +1332,7 @@ with tab3:
             - PC1 <span style="color:#51C622; font-weight:bold;">- Actividad financiera (volumen/intensidad);</span> <br>
             - PC2 <span style="color:#51C622; font-weight:bold;">- Servicios digitales (infraestructura/acceso), y</span> <br>
             - PC3 <span style="color:#51C622; font-weight:bold;">- Adopción financiera (diversificación/inclusión).</span> <br>
-            Con esta metodología se proporciona una visión muy completa del desarrollo financiero y digital de los municipios.
+            Con esta metodología se proporciona una visión completa del desarrollo financiero y digital de los municipios.
         </div>
         """,
         unsafe_allow_html=True
