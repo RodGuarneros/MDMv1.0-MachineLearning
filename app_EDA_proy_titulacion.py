@@ -1545,6 +1545,7 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
         color_discrete_map=color_map
     )
 
+
     # Compute adjusted R² and regression line equation
     X = df_clean[[x_variable]].values
     y = df_clean[y_variable].values
