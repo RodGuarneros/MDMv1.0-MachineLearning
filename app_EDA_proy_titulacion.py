@@ -846,3 +846,4 @@ st.markdown("""
     Para sugerencias o consultas, <a href="mailto:rodrigo.guarneros@gmail.com">escríbeme</a>.
 </p>
 """, unsafe_allow_html=True)
+# nueva version
