@@ -102,55 +102,6 @@ st.markdown("""
 
 # Función para convertir ObjectId a str
 
-# Función para convertir ObjectId a str
-def convert_objectid_to_str(document):
-    for key, value in document.items():
-        if isinstance(value, ObjectId):
-            document[key] = str(value)
-    return document
-
-# Conexión a MongoDB: se crea solo una vez y se comparte durante la sesión
-@st.cache_resource
-def get_mongo_client():
-    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
-    return MongoClient(mongo_uri)
-
-# Función genérica para obtener datos de cualquier colección y almacenarlos en caché
-@st.cache_data
-def fetch_collection(collection_name, projection=None):
-    client = get_mongo_client()
-    db = client["Municipios_Rodrigo"]
-    collection = db[collection_name]
-    documentos = list(collection.find({}, projection))
-    documentos = list(map(convert_objectid_to_str, documentos))
-    return pd.DataFrame(documentos)
-
-# Ejemplos de uso: 
-# Reemplaza las funciones antiguas por estas asignaciones
-datos = fetch_collection("datos_finales")
-input_datos = datos.copy()  # o simplemente input_datos = datos
-dataset_complete = fetch_collection("completo")
-df = fetch_collection("X_for_training_normalizer")
-df_normalizado = fetch_collection("df_pca_norm")
-
-# Para obtener el archivo GeoJSON desde GridFS y guardarlo en caché:
-@st.cache_data
-def fetch_geojson():
-    client = get_mongo_client()
-    db = client["Municipios_Rodrigo"]
-    fs = GridFS(db)
-    file = fs.find_one({'filename': 'municipios.geojson'})
-    if file:
-        return file.read()
-    return None
-
-geojson_data = fetch_geojson()
-if geojson_data:
-    geojson = gpd.read_file(BytesIO(geojson_data))
-else:
-    geojson = None
-
-
 def convert_objectid_to_str(document):
     for key, value in document.items():
         if isinstance(value, ObjectId):
@@ -185,6 +136,40 @@ def incrementar_contador_visitas():
 # Incrementar contador de visitas
 contador_visitas = incrementar_contador_visitas()
 
+# Función para cargar y procesar los datos con cache
+@st.cache_data
+def bajando_procesando_datos():
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    client = MongoClient(mongo_uri)
+    db = client['Municipios_Rodrigo']
+    collection = db['datos_finales']
+
+    # Obtener datos y convertir a DataFrame
+    datos_raw = collection.find()
+    datos = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+    # Asegurarse de que los datos estén en Latin1
+    for column in datos.select_dtypes(include=['object']).columns:
+        datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
+
+    categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
+    # Limpiar y normalizar la variable Madurez
+    # datos['Madurez'] = datos['Madurez'].str.strip()
+    
+    # Convertir a categoría con orden específico
+    datos['Madurez'] = pd.Categorical(
+        datos['Madurez'],
+        categories=categorias_orden,
+        ordered=False
+    )
+    
+    return datos
+
+
+
+# Llamar a la función para cargar y procesar los datos
+datos = bajando_procesando_datos()
+input_datos = datos
 
 # Procesar otras columnas como se mencionaba en el código original
 datos['Operadores Escala Pequeña BAF'] = datos['operadores_escal_pequeña_baf']
@@ -192,6 +177,74 @@ datos.drop(columns=['operadores_escal_pequeña_baf'], inplace=True)
 datos['Penetración BAF (Fibra)'] = datos['penetracion_baf_fibra']
 datos.drop(columns=['penetracion_baf_fibra'], inplace=True)
 
+# OBTENIENDO EL DATASET COMPLETO:
+@st.cache_data
+def bajando_procesando_datos_completos():
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    
+    # Conexión a MongoDB usando la URI desde los secretos
+    client = MongoClient(mongo_uri)
+    db = client['Municipios_Rodrigo']
+    collection = db['completo']
+
+    # Obtener todos los documentos de la colección y convertir ObjectId a str
+    datos_raw = collection.find()
+
+    dataset_complete = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+    for column in dataset_complete.select_dtypes(include=['object']).columns:
+        dataset_complete[column] = dataset_complete[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
+
+    # Limpiar los nombres de las columnas eliminando espacios
+    dataset_complete.columns = dataset_complete.columns.str.strip()
+
+    return dataset_complete
+
+dataset_complete = bajando_procesando_datos_completos()
+
+# OBTENIENDO X PARA EL TRAINING NORMALIZER:
+@st.cache_data
+def bajando_procesando_X_entrenamiento():
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    
+    # Conexión a MongoDB usando la URI desde los secretos
+    client = MongoClient(mongo_uri)
+    db = client['Municipios_Rodrigo']
+    collection = db['X_for_training_normalizer']
+
+    # Obtener todos los documentos de la colección y convertir ObjectId a str
+    datos_raw = collection.find()
+    df = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+    # Limpiar los nombres de las columnas eliminando espacios
+    df.columns = df.columns.str.strip()
+
+    return df
+
+df = bajando_procesando_X_entrenamiento()
+
+# OBTENIENDO DF PCA NORMALIZER:
+@st.cache_data
+def bajando_procesando_df_normalizado():
+    # Obtener la URI de MongoDB desde los secretos
+    mongo_uri = st.secrets["MONGO"]["MONGO_URI"]
+    
+    # Conexión a MongoDB usando la URI desde los secretos
+    client = MongoClient(mongo_uri)
+    db = client['Municipios_Rodrigo']
+    collection = db['df_pca_norm']
+
+    # Obtener todos los documentos de la colección y convertir ObjectId a str
+    datos_raw = collection.find()
+    df_normalizado = pd.DataFrame(list(map(convert_objectid_to_str, datos_raw)))
+
+    # Limpiar los nombres de las columnas eliminando espacios
+    df_normalizado.columns = df_normalizado.columns.astype(str).str.strip()
+
+    return df_normalizado
+
+df_normalizado = bajando_procesando_df_normalizado()
 
 # Procesamiento de variables numéricas y categóricas
 variable_list_numerica = list(input_datos.select_dtypes(include=['int64', 'float64']).columns)
@@ -207,26 +260,40 @@ variable_list_numeric = [col for col in variable_list_numerica if col not in col
 variable_list_categorical = [col for col in variable_list_categoricala if col not in columns_to_exclude_categorical]
 
 # Conectar a MongoDB con caché para los polígonos
+@st.cache_resource
+def connect_to_mongo(mongo_uri):
+    client = MongoClient(mongo_uri)
+    return client['Municipios_Rodrigo']
+
+# Obtener el archivo GeoJSON desde MongoDB GridFS con caché
+@st.cache_data
+def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
+    fs = GridFS(_db)
+    file = fs.find_one({'filename': 'municipios.geojson'})
+    if file:
+        return file.read()
+    return None
 
 # Convertir los datos a GeoDataFrame
 def geojson_to_geodataframe(geojson_data):
     return gpd.read_file(BytesIO(geojson_data))
 
-# Obtener el archivo GeoJSON usando la función con caché
-geojson_data = fetch_geojson()
+# Conectar a MongoDB
+mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
+db = connect_to_mongo(mongo_uri)
+
+# Obtener el archivo GeoJSON
+geojson_data = consultando_base_de_datos(db)
 
 # Convertir a GeoDataFrame si los datos fueron encontrados
-if geojson_data:
-    geojson = geojson_to_geodataframe(geojson_data)
-else:
-    geojson = None
+geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
 
 # Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
 if geojson is not None:
     datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
     datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
     geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
-    
+
     # Fusionar los datos con la geometría
     dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
 
