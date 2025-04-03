@@ -213,8 +213,8 @@ def geojson_to_geodataframe(geojson_data):
     return gpd.read_file(BytesIO(geojson_data))
 
 # Conectar a MongoDB
-mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
-db = connect_to_mongo(mongo_uri)
+# mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
+# db = connect_to_mongo(mongo_uri)
 
 # Obtener el archivo GeoJSON
 geojson_data = consultando_base_de_datos(db)
