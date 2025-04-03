@@ -343,13 +343,29 @@ def plot_bar_chart(data, lugar_columna, indice_columna, lugar_seleccionado):
 fig_ranking = plot_bar_chart(datos, 'Lugar', 'Índice_Compuesto', variable_seleccionada_municipio)
 
 def crear_display(data, lugar_seleccionado):
-    mapa_colores = {'En desarrollo': '#D20103', 'Inicial': '#5DE2E7', 'Definición': '#CC6CE7', 'Optimización': '#51C622'}
+    mapa_colores = {
+        'En desarrollo': '#D20103',
+        'Inicial': '#5DE2E7',
+        'Definición': '#CC6CE7',
+        'Optimización': '#51C622',
+    }
+    
+    # Filtrar la fila correspondiente al municipio seleccionado
     lugar_row = data[data['Lugar'] == lugar_seleccionado]
     if lugar_row.empty:
         return None
-    lugar_ranking = lugar_row['Ranking'].iloc[0]
-    etapa_madurez = lugar_row['Etapa_Madurez'].iloc[0]
+    
+    # MODIFICA ESTAS LÍNEAS según el nombre real de tus columnas:
+    # Si en tu DataFrame las columnas se llaman "ranking" y "etapa_madurez", úsalo así:
+    lugar_ranking = lugar_row['ranking'].iloc[0]
+    etapa_madurez = lugar_row['etapa_madurez'].iloc[0]
+    
+    # Si en tu DataFrame se llaman "Ranking" y "Etapa_Madurez", entonces deja el código original:
+    # lugar_ranking = lugar_row['Ranking'].iloc[0]
+    # etapa_madurez = lugar_row['Etapa_Madurez'].iloc[0]
+    
     color_rect = mapa_colores.get(etapa_madurez, 'dodgerblue')
+    
     fig = go.Figure()
     fig.add_shape(
         type="path",
@@ -360,22 +376,28 @@ def crear_display(data, lugar_seleccionado):
         layer="below",
         opacity=1
     )
+    
     fig.add_annotation(
         text="Lugar en el Ranking de 2,456 municipios en México",
-        x=0.5, y=0.80,
+        x=0.5,
+        y=0.80,
         showarrow=False,
         font=dict(family="Arial", size=12, color="#050505"),
         align="center"
     )
+    
     fig.add_annotation(
         text=str(int(lugar_ranking)),
-        x=0.5, y=0.35,
+        x=0.5,
+        y=0.35,
         showarrow=False,
         font=dict(family="Arial", size=37, color="#050505"),
         align="center"
     )
+    
     fig.update_layout(
-        width=200, height=70,
+        width=200,
+        height=70,
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor=color_rect,
         plot_bgcolor=color_rect,
@@ -383,7 +405,9 @@ def crear_display(data, lugar_seleccionado):
         xaxis=dict(showgrid=False, zeroline=False, visible=False, range=[0, 1]),
         yaxis=dict(showgrid=False, zeroline=False, visible=False, range=[0, 1])
     )
+    
     return fig
+
 
 cuadro_resumen = crear_display(datos, variable_seleccionado_municipio)
 
