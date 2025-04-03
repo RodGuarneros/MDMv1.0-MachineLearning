@@ -600,7 +600,7 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
                       font=dict(color='white'), paper_bgcolor='rgb(0, 0, 0)', plot_bgcolor='rgb(0, 0, 0)')
     return fig
 
-grafico2d3 = generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
+grafico2d3 = generar_grafico_2d3(datos, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
 
 def boxplot_por_cluster(df, variable):
     color_map = {'Optimización': '#51C622', 'Definición': '#CC6CE7', 'En desarrollo': '#D20103', 'Inicial': '#5DE2E7'}
