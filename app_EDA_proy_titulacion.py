@@ -212,22 +212,21 @@ variable_list_categorical = [col for col in variable_list_categoricala if col no
 def geojson_to_geodataframe(geojson_data):
     return gpd.read_file(BytesIO(geojson_data))
 
-# Conectar a MongoDB
-# mongo_uri = st.secrets["MONGO"]["MONGO_URI"]  # Usar la URI de MongoDB desde los secretos
-# db = connect_to_mongo(mongo_uri)
-
-# Obtener el archivo GeoJSON
-geojson_data = consultando_base_de_datos(db)
+# Obtener el archivo GeoJSON usando la función con caché
+geojson_data = fetch_geojson()
 
 # Convertir a GeoDataFrame si los datos fueron encontrados
-geojson = geojson_to_geodataframe(geojson_data) if geojson_data else None
+if geojson_data:
+    geojson = geojson_to_geodataframe(geojson_data)
+else:
+    geojson = None
 
 # Si tienes un DataFrame `datos`, realiza la fusión con el GeoDataFrame
 if geojson is not None:
     datos.rename(columns={'cvegeo': 'CVEGEO'}, inplace=True)
     datos['CVEGEO'] = datos['CVEGEO'].astype(str).str.zfill(5)
     geojson['CVEGEO'] = geojson['CVEGEO'].astype(str)
-
+    
     # Fusionar los datos con la geometría
     dataset_complete_geometry = datos.merge(geojson[['CVEGEO', 'geometry']], on='CVEGEO', how='left')
 
