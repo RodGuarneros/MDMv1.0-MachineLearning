@@ -160,7 +160,7 @@ def bajando_procesando_datos():
     datos['Madurez'] = pd.Categorical(
         datos['Madurez'],
         categories=categorias_orden,
-        ordered=False
+        ordered=True
     )
     
     return datos
