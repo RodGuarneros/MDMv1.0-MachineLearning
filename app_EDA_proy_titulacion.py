@@ -157,11 +157,8 @@ def bajando_procesando_datos():
     # datos['Madurez'] = datos['Madurez'].str.strip()
     
     # Convertir a categoría con orden específico
-    datos['Madurez'] = pd.Categorical(
-        datos['Madurez'],
-        categories=categorias_orden,
-        ordered=True
-    )
+    df['Madurez'] = df['Madurez'].astype('category')
+
     
     return datos
 
@@ -1029,10 +1026,6 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 #################
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Primero, asegurarse que los valores de Madurez estén limpios y sean consistentes
-
-
-    # Limpieza y normalización explícita de los valores de Madurez
-    df['Madurez'] = df['Madurez'].astype('category')
 
 
 
