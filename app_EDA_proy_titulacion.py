@@ -155,11 +155,9 @@ def bajando_procesando_datos():
     categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
     # Limpiar y normalizar la variable Madurez
     # datos['Madurez'] = datos['Madurez'].str.strip()
+    # datos['Madurez'] = datos['Madurez'].astype(str).str.strip()
     
-    # Convertir a categoría con orden específico
     
-    df['Madurez'].cat.set_categories(categorias_orden, ordered=false, inplace=True)
-
     return datos
 
 
