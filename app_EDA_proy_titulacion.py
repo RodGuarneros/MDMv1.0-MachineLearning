@@ -1029,6 +1029,14 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 #################
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Primero, asegurarse que los valores de Madurez estén limpios y sean consistentes
+
+
+    # Limpieza y normalización explícita de los valores de Madurez
+    etapas_validas = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
+    df['Etapa_Madurez'] = df['Madurez'].apply(lambda x: x.strip() if isinstance(x, str) else x)
+    df['Etapa_Madurez'] = df['Etapa_Madurez'].where(df['Etapa_Madurez'].isin(etapas_validas), 'Inicial')
+
+
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
