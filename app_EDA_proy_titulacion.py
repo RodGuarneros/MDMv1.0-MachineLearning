@@ -157,9 +157,9 @@ def bajando_procesando_datos():
     # datos['Madurez'] = datos['Madurez'].str.strip()
     
     # Convertir a categoría con orden específico
+    
     df['Madurez'] = df['Madurez'].astype('category')
 
-    
     return datos
 
 
@@ -1134,8 +1134,6 @@ grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
     
-    df['Madurez'] = df['Madurez'].astype('category')
-    
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
     df_pca2 = df_pca2[:, 1:4]
@@ -1215,7 +1213,7 @@ grafico2d1 = generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_sele
 
 def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Limpiar posibles espacios o caracteres invisibles en 'Madurez'
-    df['Madurez'] = df['Madurez'].astype('category')
+
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1300,8 +1298,7 @@ grafico2d2 = generar_grafico_2d2(datos, df_normalizado, dataset_complete, lugar_
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].astype('category')
-    
+     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
     df_pca2 = df_pca2[:, 1:4]
@@ -1528,9 +1525,7 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
     # Drop rows with missing values in relevant columns
     df_clean = df.dropna(subset=[x_variable, y_variable])
 
-    df['Madurez'] = df['Madurez'].astype('category')
-
-
+    
     # Define a custom color map for clusters
     color_map = {
         'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
@@ -1639,9 +1634,7 @@ fig_scatter = generate_scatter_with_annotations(input_datos, variable_selecciona
 def generar_mapa_con_lugar(df, lugar=None):
     # Definir el mapa de colores para los clústeres
 
-    df['Madurez'] = df['Madurez'].astype('category')
-
-
+    
     color_map = {
         'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
         'Inicial': '#5DE2E7',    # Cluster 1 -> Turquesa
@@ -1649,9 +1642,7 @@ def generar_mapa_con_lugar(df, lugar=None):
         'Optimización': '#51C622',    # Cluster 3 -> Verde oscuro
     }
 
-    # Asegurarse de que 'Cluster2' sea categórico
-    df['Madurez'] = df['Madurez'].astype('category')
-
+    
     # Crear el mapa con Plotly usando scatter_mapbox
     fig = px.scatter_mapbox(
         df,
@@ -1716,8 +1707,7 @@ def recuento(df):
     df_counts.columns = ['Madurez', 'Cantidad']
     df_counts['Frecuencia relativa'] = df_counts['Cantidad'] / total_municipios
 
-    df['Madurez'] = df['Madurez'].astype('category')
-
+    
 
     # Definir el color map personalizado
     color_map = {
