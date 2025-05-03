@@ -158,7 +158,7 @@ def bajando_procesando_datos():
     
     # Convertir a categoría con orden específico
     
-    df['Madurez'] = df['Madurez'].astype('category')
+    df['Madurez'].cat.set_categories(categorias_orden, ordered=false, inplace=True)
 
     return datos
 
