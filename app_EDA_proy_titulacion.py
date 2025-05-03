@@ -1032,9 +1032,8 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
 
     # Limpieza y normalización explícita de los valores de Madurez
-    etapas_validas = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
-    df['Etapa_Madurez'] = df['Madurez'].apply(lambda x: x.strip() if isinstance(x, str) else x)
-    df['Etapa_Madurez'] = df['Etapa_Madurez'].where(df['Etapa_Madurez'].isin(etapas_validas), 'Inicial')
+    df['Madurez'] = df['Madurez'].astype('category')
+
 
 
     color_map = {
@@ -1141,7 +1140,8 @@ grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete
 
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    
+    df['Madurez'] = df['Madurez'].astype('category')
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1307,7 +1307,7 @@ grafico2d2 = generar_grafico_2d2(datos, df_normalizado, dataset_complete, lugar_
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
+    df['Madurez'] = df['Madurez'].astype('category')
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1535,6 +1535,9 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
     # Drop rows with missing values in relevant columns
     df_clean = df.dropna(subset=[x_variable, y_variable])
 
+    df['Madurez'] = df['Madurez'].astype('category')
+
+
     # Define a custom color map for clusters
     color_map = {
         'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
@@ -1643,6 +1646,9 @@ fig_scatter = generate_scatter_with_annotations(input_datos, variable_selecciona
 def generar_mapa_con_lugar(df, lugar=None):
     # Definir el mapa de colores para los clústeres
 
+    df['Madurez'] = df['Madurez'].astype('category')
+
+
     color_map = {
         'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
         'Inicial': '#5DE2E7',    # Cluster 1 -> Turquesa
@@ -1716,6 +1722,9 @@ def recuento(df):
     df_counts = counts.reset_index()
     df_counts.columns = ['Madurez', 'Cantidad']
     df_counts['Frecuencia relativa'] = df_counts['Cantidad'] / total_municipios
+
+    df['Madurez'] = df['Madurez'].astype('category')
+
 
     # Definir el color map personalizado
     color_map = {
