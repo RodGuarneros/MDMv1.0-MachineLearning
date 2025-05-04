@@ -1055,18 +1055,18 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
         category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
         color_discrete_map=color_map
     )
-    # Manejar lugar seleccionado
-    if lugar_seleccionado:
-        lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
-        if not lugar_df.empty:
-            # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
-            fig.add_trace(
-                px.scatter_3d(lugar_df, 
-                             x='PCA1', y='PCA2', z='PCA3', hover_data=['Lugar'],
-                             color_discrete_map={'Madurez': 'green'}).data[0]
-            )
-            fig.update_traces(marker=dict(size=20, color='green', opacity=1), 
-                            selector=dict(name=lugar_seleccionado))
+    # # Manejar lugar seleccionado
+    # if lugar_seleccionado:
+    #     lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
+    #     if not lugar_df.empty:
+    #         # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
+    #         fig.add_trace(
+    #             px.scatter_3d(lugar_df, 
+    #                          x='PCA1', y='PCA2', z='PCA3', hover_data=['Lugar'],
+    #                          color_discrete_map={'Madurez': 'green'}).data[0]
+    #         )
+    #         fig.update_traces(marker=dict(size=20, color='green', opacity=1), 
+    #                         selector=dict(name=lugar_seleccionado))
 
     # Actualizar estilo de los marcadores
     fig.update_traces(
