@@ -1052,7 +1052,7 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
                 'PCA2': 'Componente PC2', 
                 'PCA3': 'Componente PC3'},
         hover_data=['Lugar'],
-        category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
+        #category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
         color_discrete_map=color_map
     )
     # Manejar lugar seleccionado
@@ -1155,7 +1155,7 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
                      labels={'PCA1': 'Componente PC1', 
                             'PCA2': 'Componente PC2'},
                      hover_data=['Lugar'],
-                     category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
+                    #  category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
                      color_discrete_map=color_map)
 
     # Manejar lugar seleccionado
@@ -1319,7 +1319,7 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
                      labels={'PCA2': 'Componente PC2', 
                             'PCA3': 'Componente PC3'},
                      hover_data=['Lugar'],
-                     category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
+                    #  category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
                      color_discrete_map=color_map)
 
     # Manejar lugar seleccionado
