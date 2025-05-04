@@ -1024,7 +1024,9 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 
 #################
 ## 3D plot PCA ##
-#################def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
+#################
+
+def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     color_map = {
         'Optimización': '#51C622',
         'Definición':   '#CC6CE7',
