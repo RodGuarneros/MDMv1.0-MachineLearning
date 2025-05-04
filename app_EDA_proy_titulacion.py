@@ -156,10 +156,10 @@ def bajando_procesando_datos():
     # Limpiar y normalizar la variable Madurez
     # datos['Madurez'] = datos['Madurez'].str.strip()
     
-    #Convertir a categoría con orden específico
-    datos['Etapa_Madurez'] = pd.Categorical(
-        datos['Etapa_Madurez'],
-        categories=categorias_orden)
+    # # Convertir a categoría con orden específico
+    # datos['Etapa_Madurez'] = pd.Categorical(
+    #     datos['Etapa_Madurez'],
+    #     categories=categorias_orden)
     
     return datos
 
@@ -1025,49 +1025,104 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 #################
 ## 3D plot PCA ##
 #################
-
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
+    # Primero, asegurarse que los valores de Madurez estén limpios y sean consistentes
     color_map = {
         'Optimización': '#51C622',
-        'Definición':   '#CC6CE7',
-        'En Desarrollo':'#D20103',
-        'Inicial':      '#5DE2E7'
+        'Definición': '#CC6CE7',
+        'En desarrollo': '#D20103',
+        'Inicial': '#5DE2E7'
     }
-    df_pca2 = df_normalizado.to_numpy()[:,1:4]
-    pca_df = pd.DataFrame(df_pca2, columns=['PCA1','PCA2','PCA3'])
-    pca_df['Etapa_Madurez'] = (
-        df['Etapa_Madurez']
-          .astype('category')
-          .cat.set_categories(
-              ['Optimización','Definición','En Desarrollo','Inicial'], ordered=True
-          )
-    )
+    
+    # Normalización de PCA
+    df_pca2 = df_normalizado.to_numpy()
+    df_pca2 = df_pca2[:, 1:4]
+
+    # Crear DataFrame para Plotly
+    pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
+    pca_df['Etapa_Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
     pca_df['Lugar'] = dataset_complete['Lugar']
+
+    # Crear el gráfico asegurando el orden y los colores
     fig = px.scatter_3d(
-        pca_df, x='PCA1', y='PCA2', z='PCA3',
+        pca_df, 
+        x='PCA1', y='PCA2', z='PCA3',
         color='Etapa_Madurez',
-        category_orders={'Etapa_Madurez': ['Optimización','Definición','En Desarrollo','Inicial']},
-        color_discrete_map=color_map,
-        labels={'PCA1':'PC1','PCA2':'PC2','PCA3':'PC3'},
-        hover_data=['Lugar']
+        labels={'PCA1': 'Componente PC1', 
+                'PCA2': 'Componente PC2', 
+                'PCA3': 'Componente PC3'},
+        hover_data=['Lugar'],
+        #category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
+        color_discrete_map=color_map
     )
-    fig.update_traces(marker=dict(size=6,opacity=0.7,line=dict(width=0.02,color='gray')))
-    fig.update_layout(
-        title="Municipios por grado de madurez multidimensional",
-        title_x=0.05,
-        paper_bgcolor='black', plot_bgcolor='black', font=dict(color='white'),
-        legend=dict(title=dict(text='Madurez'),font=dict(color='white')),
-        scene=dict(
-            xaxis=dict(title='PC1',gridcolor='white'),
-            yaxis=dict(title='PC2',gridcolor='white'),
-            zaxis=dict(title='PC3',gridcolor='white'),
-            bgcolor='black'
+    # Manejar lugar seleccionado
+    if lugar_seleccionado:
+        lugar_df = pca_df[pca_df['Lugar'] == lugar_seleccionado]
+        if not lugar_df.empty:
+            # Agregar los puntos del lugar seleccionado al gráfico y cambiar su color y tamaño
+            fig.add_trace(
+                px.scatter_3d(lugar_df, 
+                             x='PCA1', y='PCA2', z='PCA3', hover_data=['Lugar'],
+                             color_discrete_map={'Madurez': 'green'}).data[0]
+            )
+            fig.update_traces(marker=dict(size=20, color='green', opacity=1), 
+                            selector=dict(name=lugar_seleccionado))
+
+    # Actualizar estilo de los marcadores
+    fig.update_traces(
+        marker=dict(
+            size=6,
+            opacity=0.7,
+            line=dict(
+                width=0.02,
+                color='gray'
+            )
         )
     )
+
+    # Actualizar layout
+    fig.update_layout(
+        title="Municipios por grado de madurez multidimensional",
+        title_x=0.05,  # Centrar el título
+        showlegend=True,  # Asegurar que la leyenda esté visible
+        legend=dict(
+            title=dict(text='Madurez'),  # Título de la leyenda
+            itemsizing='constant',  # Tamaño constante para los elementos de la leyenda
+            font=dict(color='white'),
+        ),
+        scene=dict(
+            xaxis_title="Componente PC1",
+            yaxis_title="Componente PC2",
+            zaxis_title="Componente PC3",
+            xaxis=dict(
+                titlefont=dict(color='white'),
+                gridcolor='white',
+                zerolinecolor='white'
+            ),
+            yaxis=dict(
+                titlefont=dict(color='white'),
+                gridcolor='white',
+                zerolinecolor='white'
+            ),
+            zaxis=dict(
+                titlefont=dict(color='white'),
+                gridcolor='white',
+                zerolinecolor='white'
+            ),
+            bgcolor='rgb(0, 0, 0)',
+            xaxis_showgrid=True,
+            yaxis_showgrid=True,
+            zaxis_showgrid=True
+        ),
+        font=dict(color='white'),
+        paper_bgcolor='rgb(0, 0, 0)',
+        plot_bgcolor='rgb(0, 0, 0)',
+    )
+
     return fig
 
-# Generar figura
-grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete)
+
+grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete, lugar_seleccionado=variable_seleccionada_municipio)
 
 ###################
 ### Gráfico 2D 1###
