@@ -278,8 +278,8 @@ def connect_to_mongo(mongo_uri):
 @st.cache_data(show_spinner=True, ttl=600)  # cachea por 10 minutos
 def consultando_base_de_datos():
     client = MongoClient(os.getenv("MONGO_URI"))
-    db = client.get_database("nombre_base")
-    coleccion = db["nombre_coleccion"]
+    db = client.get_database("Municiopios_Rodrigo")
+    coleccion = db["datos_finales"]
     documentos = list(coleccion.find({}))  # ⚠️ evita traer todo si no lo necesitas
     df = pd.DataFrame(documentos)
     return df
