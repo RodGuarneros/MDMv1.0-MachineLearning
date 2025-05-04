@@ -157,8 +157,8 @@ def bajando_procesando_datos():
     # datos['Madurez'] = datos['Madurez'].str.strip()
     
     # Convertir a categoría con orden específico
-    datos['Madurez'] = pd.Categorical(
-        datos['Madurez'],
+    datos['Etapa_Madurez'] = pd.Categorical(
+        datos['Etapa_Madurez'],
         categories=categorias_orden,
         ordered=False
     )
