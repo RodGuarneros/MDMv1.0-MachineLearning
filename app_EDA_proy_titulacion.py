@@ -1301,7 +1301,7 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Etapa_Madurez'].astype('category')
+    pca_df['Etapa_Madurez'] = df['Madurez'].astype('category')
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores estricto
