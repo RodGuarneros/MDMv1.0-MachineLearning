@@ -1052,7 +1052,7 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
                 'PCA2': 'Componente PC2', 
                 'PCA3': 'Componente PC3'},
         hover_data=['Lugar'],
-        #category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
+        category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},
         color_discrete_map=color_map
     )
     # Manejar lugar seleccionado
