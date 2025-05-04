@@ -265,12 +265,16 @@ def connect_to_mongo(mongo_uri):
 # Obtener el archivo GeoJSON desde MongoDB GridFS con caché
 @st.cache_data(show_spinner=True, ttl=600)  # cachea por 10 minutos
 def consultando_base_de_datos():
+    # 1) Abrir la conexión aquí
     client = MongoClient(os.getenv("MONGO_URI"))
-    db = client.get_database("nombre_base")
-    coleccion = db["nombre_coleccion"]
-    documentos = list(coleccion.find({}))  # ⚠️ evita traer todo si no lo necesitas
+    db = client["Municipios_Rodrigo"]            # <- Ajusta al nombre real de tu base
+    coleccion = db["nombre_coleccion"]            # <- Ajusta al nombre real de tu colección
+
+    # 2) Ejecutar la consulta
+    documentos = list(coleccion.find({}))
     df = pd.DataFrame(documentos)
     return df
+
 
 
 # Convertir los datos a GeoDataFrame
