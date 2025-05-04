@@ -3,26 +3,32 @@
 #######################
 import streamlit as st
 import pandas as pd
+import altair as alt
+import plotly.express as px
+import io
+import geopandas as gpd
 import numpy as np
 import json
-import geopandas as gpd
-import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
-import altair as alt
-from streamlit_folium import folium_static
+import altair_viewer as altviewer
+import logging
 import folium
+import zipfile
+from streamlit import components
+from sklearn.linear_model import LinearRegression
+import folium
+from streamlit_folium import folium_static  # Importar folium_static para Streamlit
+from scipy.stats import gaussian_kde
 import pymongo
 from pymongo import MongoClient
-from bson import ObjectId
 from gridfs import GridFS
 from io import BytesIO
 from dotenv import load_dotenv
-from concurrent.futures import ThreadPoolExecutor
 import os
-import logging
+from bson import ObjectId
+from concurrent.futures import ThreadPoolExecutor
 
-load_dotenv()
 
 # Page configuration
 st.set_page_config(
@@ -146,26 +152,11 @@ def bajando_procesando_datos():
     for column in datos.select_dtypes(include=['object']).columns:
         datos[column] = datos[column].apply(lambda x: x.encode('Latin1').decode('Latin1') if isinstance(x, str) else x)
 
-
-    # Limpiar espacios y estandarizar capitalización
-    datos['Etapa_Madurez'] = datos['Madurez'].str.strip().str.title()
-
-    # Orden personalizado
-    categorias_orden = ['Optimización', 'Definición', 'En Desarrollo', 'Inicial']
-
-    # Convertir a categoría ordenada
-    datos['Etapa_Madurez'] = pd.Categorical(
-        datos['Etapa_Madurez'],
-        categories=categorias_orden,
-        ordered=True
-    )
-
     categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
     # Limpiar y normalizar la variable Madurez
     # datos['Madurez'] = datos['Madurez'].str.strip()
     
     # Convertir a categoría con orden específico
-    
     datos['Madurez'] = pd.Categorical(
         datos['Madurez'],
         categories=categorias_orden,
@@ -275,15 +266,13 @@ def connect_to_mongo(mongo_uri):
     return client['Municipios_Rodrigo']
 
 # Obtener el archivo GeoJSON desde MongoDB GridFS con caché
-@st.cache_data(show_spinner=True, ttl=600)  # cachea por 10 minutos
-def consultando_base_de_datos():
-    client = MongoClient(os.getenv("MONGO_URI"))
-    db = client.get_database("Municiopios_Rodrigo")
-    coleccion = db["datos_finales"]
-    documentos = list(coleccion.find({}))  # ⚠️ evita traer todo si no lo necesitas
-    df = pd.DataFrame(documentos)
-    return df
-
+@st.cache_data
+def consultando_base_de_datos(_db):  # Cambiar 'db' a '_db' para evitar el error
+    fs = GridFS(_db)
+    file = fs.find_one({'filename': 'municipios.geojson'})
+    if file:
+        return file.read()
+    return None
 
 # Convertir los datos a GeoDataFrame
 def geojson_to_geodataframe(geojson_data):
@@ -1040,9 +1029,6 @@ fig_boxplot = generate_boxplot_with_annotations(input_datos, variable_selecciona
 #################
 def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Primero, asegurarse que los valores de Madurez estén limpios y sean consistentes
-
-
-
     color_map = {
         'Optimización': '#51C622',
         'Definición': '#CC6CE7',
@@ -1056,14 +1042,14 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
+    pca_df['Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Crear el gráfico asegurando el orden y los colores
     fig = px.scatter_3d(
         pca_df, 
         x='PCA1', y='PCA2', z='PCA3',
-        color='Etapa_Madurez',
+        color='Madurez',
         labels={'PCA1': 'Componente PC1', 
                 'PCA2': 'Componente PC2', 
                 'PCA3': 'Componente PC3'},
@@ -1147,15 +1133,15 @@ grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete
 
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
+    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
-        
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
     df_pca2 = df_pca2[:, 1:4]
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Etapa_Madurez'].astype('category')
+    pca_df['Madurez'] = df['Madurez'].astype('category')
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores estricto
@@ -1169,7 +1155,7 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
     # Crear el gráfico de dispersión 2D
     fig = px.scatter(pca_df, 
                      x='PCA1', y='PCA2',
-                     color='Etapa_Madurez',
+                     color='Madurez',
                      labels={'PCA1': 'Componente PC1', 
                             'PCA2': 'Componente PC2'},
                      hover_data=['Lugar'],
@@ -1227,6 +1213,8 @@ grafico2d1 = generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_sele
 
 
 def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
+    # Limpiar posibles espacios o caracteres invisibles en 'Madurez'
+    df['Madurez'] = df['Madurez'].astype('category')
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1234,7 +1222,7 @@ def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Etapa_Madurez']
+    pca_df['Etapa_Madurez'] = df['Madurez']
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores más contrastante
@@ -1310,6 +1298,8 @@ grafico2d2 = generar_grafico_2d2(datos, df_normalizado, dataset_complete, lugar_
 
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
+    # Asegurarse de que no haya espacios extras o diferencias de capitalización
+    df['Madurez'] = df['Madurez'].str.strip()  # Eliminar espacios
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1317,7 +1307,7 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Etapa_Madurez'].astype('category')
+    pca_df['Madurez'] = df['Madurez'].astype('category')
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores estricto
@@ -1331,11 +1321,11 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
     # Crear el gráfico de dispersión 2D
     fig = px.scatter(pca_df, 
                      x='PCA2', y='PCA3',
-                     color='Etapa_Madurez',
+                     color='Madurez',
                      labels={'PCA2': 'Componente PC2', 
                             'PCA3': 'Componente PC3'},
                      hover_data=['Lugar'],
-                     category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
+                     category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
                      color_discrete_map=color_map)
 
     # Manejar lugar seleccionado
@@ -1537,9 +1527,6 @@ def generate_scatter_with_annotations(df, x_variable, y_variable, categorical_va
     # Drop rows with missing values in relevant columns
     df_clean = df.dropna(subset=[x_variable, y_variable])
 
-    df['Madurez'] = df['Madurez'].astype('category')
-
-
     # Define a custom color map for clusters
     color_map = {
         'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
@@ -1648,9 +1635,6 @@ fig_scatter = generate_scatter_with_annotations(input_datos, variable_selecciona
 def generar_mapa_con_lugar(df, lugar=None):
     # Definir el mapa de colores para los clústeres
 
-    df['Madurez'] = df['Madurez'].astype('category')
-
-
     color_map = {
         'En desarrollo': '#D20103',    # Cluster 0 -> Rojo
         'Inicial': '#5DE2E7',    # Cluster 1 -> Turquesa
@@ -1724,9 +1708,6 @@ def recuento(df):
     df_counts = counts.reset_index()
     df_counts.columns = ['Madurez', 'Cantidad']
     df_counts['Frecuencia relativa'] = df_counts['Cantidad'] / total_municipios
-
-    df['Madurez'] = df['Madurez'].astype('category')
-
 
     # Definir el color map personalizado
     color_map = {
