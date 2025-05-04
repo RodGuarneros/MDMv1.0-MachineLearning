@@ -156,10 +156,10 @@ def bajando_procesando_datos():
     # Limpiar y normalizar la variable Madurez
     # datos['Madurez'] = datos['Madurez'].str.strip()
     
-    # Convertir a categoría con orden específico
-    datos['Etapa_Madurez'] = pd.Categorical(
-        datos['Etapa_Madurez'],
-        categories=categorias_orden)
+    # # Convertir a categoría con orden específico
+    # datos['Etapa_Madurez'] = pd.Categorical(
+    #     datos['Etapa_Madurez'],
+    #     categories=categorias_orden)
     
     return datos
 
