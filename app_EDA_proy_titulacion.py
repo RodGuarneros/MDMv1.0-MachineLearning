@@ -1035,8 +1035,8 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
     }
     df_pca2 = df_normalizado.to_numpy()[:,1:4]
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1','PCA2','PCA3'])
-    pca_df['Etapa_Madurez'] = (
-        df['Etapa_Madurez']
+    pca_df['Madurez'] = (
+        df['Madurez']
           .astype('category')
           .cat.set_categories(
               ['Optimización','Definición','En Desarrollo','Inicial'], ordered=True
@@ -1045,8 +1045,8 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
     pca_df['Lugar'] = dataset_complete['Lugar']
     fig = px.scatter_3d(
         pca_df, x='PCA1', y='PCA2', z='PCA3',
-        color='Etapa_Madurez',
-        category_orders={'Etapa_Madurez': ['Optimización','Definición','En Desarrollo','Inicial']},
+        color='Madurez',
+        category_orders={'Madurez': ['Optimización','Definición','En Desarrollo','Inicial']},
         color_discrete_map=color_map,
         labels={'PCA1':'PC1','PCA2':'PC2','PCA3':'PC3'},
         hover_data=['Lugar']
