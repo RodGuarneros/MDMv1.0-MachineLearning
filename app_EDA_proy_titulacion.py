@@ -160,11 +160,6 @@ def bajando_procesando_datos():
         ordered=True
     )
 
-
-
-
-
-
     categorias_orden = ['Optimización', 'Definición', 'En desarrollo', 'Inicial']
     # Limpiar y normalizar la variable Madurez
     # datos['Madurez'] = datos['Madurez'].str.strip()
@@ -1061,14 +1056,14 @@ def generar_grafico_3d_con_lugar(df, df_normalizado, dataset_complete, lugar_sel
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
+    pca_df['Etapa_Madurez'] = df['Etapa_Madurez']  # Usar la versión categorizada
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Crear el gráfico asegurando el orden y los colores
     fig = px.scatter_3d(
         pca_df, 
         x='PCA1', y='PCA2', z='PCA3',
-        color='Madurez',
+        color='Etapa_Madurez',
         labels={'PCA1': 'Componente PC1', 
                 'PCA2': 'Componente PC2', 
                 'PCA3': 'Componente PC3'},
@@ -1153,15 +1148,14 @@ grafico3d = generar_grafico_3d_con_lugar(datos, df_normalizado, dataset_complete
 def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
     # Asegurarse de que no haya espacios extras o diferencias de capitalización
     
-    df['Madurez'] = df['Madurez'].astype('category')
-    
+        
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
     df_pca2 = df_pca2[:, 1:4]
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Madurez'].astype('category')
+    pca_df['Etapa_Madurez'] = df['Etapa_Madurez'].astype('category')
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores estricto
@@ -1175,7 +1169,7 @@ def generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_seleccionado=
     # Crear el gráfico de dispersión 2D
     fig = px.scatter(pca_df, 
                      x='PCA1', y='PCA2',
-                     color='Madurez',
+                     color='Etapa_Madurez',
                      labels={'PCA1': 'Componente PC1', 
                             'PCA2': 'Componente PC2'},
                      hover_data=['Lugar'],
@@ -1233,8 +1227,6 @@ grafico2d1 = generar_grafico_2d(df, df_normalizado, dataset_complete, lugar_sele
 
 
 def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Limpiar posibles espacios o caracteres invisibles en 'Madurez'
-    df['Madurez'] = df['Madurez'].astype('category')
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1242,7 +1234,7 @@ def generar_grafico_2d2(df, df_normalizado, dataset_complete, lugar_seleccionado
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Etapa_Madurez'] = df['Madurez']
+    pca_df['Etapa_Madurez'] = df['Etapa_Madurez']
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores más contrastante
@@ -1318,8 +1310,6 @@ grafico2d2 = generar_grafico_2d2(datos, df_normalizado, dataset_complete, lugar_
 
 
 def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado=None):
-    # Asegurarse de que no haya espacios extras o diferencias de capitalización
-    df['Madurez'] = df['Madurez'].astype('category')
     
     # Normalización de PCA
     df_pca2 = df_normalizado.to_numpy()
@@ -1327,7 +1317,7 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
 
     # Crear DataFrame para Plotly
     pca_df = pd.DataFrame(df_pca2, columns=['PCA1', 'PCA2', 'PCA3'])
-    pca_df['Madurez'] = df['Madurez'].astype('category')
+    pca_df['Etapa_Madurez'] = df['Etapa_Madurez'].astype('category')
     pca_df['Lugar'] = dataset_complete['Lugar']
 
     # Definir un mapa de colores estricto
@@ -1341,11 +1331,11 @@ def generar_grafico_2d3(df, df_normalizado, dataset_complete, lugar_seleccionado
     # Crear el gráfico de dispersión 2D
     fig = px.scatter(pca_df, 
                      x='PCA2', y='PCA3',
-                     color='Madurez',
+                     color='Etapa_Madurez',
                      labels={'PCA2': 'Componente PC2', 
                             'PCA3': 'Componente PC3'},
                      hover_data=['Lugar'],
-                     category_orders={'Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
+                     category_orders={'Etapa_Madurez': ['Optimización', 'Definición', 'En desarrollo', 'Inicial']},  # Orden explícito
                      color_discrete_map=color_map)
 
     # Manejar lugar seleccionado
